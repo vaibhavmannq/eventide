@@ -304,7 +304,7 @@ needed.
 | Service | Free allowance (checked 2026-10-25) | Eventide's use |
 |---|---|---|
 | Cloudflare Workers | 100,000 requests/day, 10 ms CPU per request, no card | API and app files; roughly 5,000 sessions a day |
-| Cloudflare Hyperdrive | 100,000 queries/day | A write is about 13 queries (transaction, row lock, idempotency, inserts), a read about 6: roughly 7,000 writes or 16,000 reads a day. The tighter of the two free limits, and the first thing to optimise (one SQL function per write) if it ever matters |
+| Cloudflare Hyperdrive | 100,000 queries/day | A write is about 8 queries (transaction, idempotency, membership, one statement for the lock and inserts), a read about 6: roughly 12,000 writes or 16,000 reads a day. The tighter of the two free limits, and the first thing to optimise (one SQL function per write) if it ever matters |
 | Neon Postgres | 0.5 GB storage (1 GB per recent reports), 100 compute-hours/month, sleeps after 5 idle minutes | The database: roughly 800,000 expenses |
 | GitHub Actions | Free for public repositories | CI, with Postgres as a service container |
 
@@ -324,9 +324,9 @@ Limits to know about:
 | Database | Integration tests against real Postgres 16: the zero-sum trigger, append-only triggers, row-level security, migrations, idempotency, optimistic edits, the change feed | Done (37 tests) |
 | API | Real HTTP requests through every middleware against Postgres: sign-in (with stand-ins for GitHub and Google), cookies, cross-site refusal, validation, idempotency byte for byte, 409 on stale edits, outsiders get 404 | Done (20 tests) |
 | Workers runtime | `wrangler dev` (the real Workers runtime) against local Postgres through the Hyperdrive setting, driven by `scripts/smoke.ts` | Done locally; against production at deploy |
-| Concurrency | 50 simultaneous writes to one group; 20 copies of one request; 10 simultaneous edits; ordering under a held commit | Done at the database layer; repeated through the API in phase 4 |
-| Crashes | Kill the API process mid-write repeatedly, retry with the same keys; count duplicates and losses (target: 0 and 0) | Phase 4 |
-| Load | k6 against a local stack: requests/second and p95 latency at increasing load | Phase 4 |
+| Concurrency | 50 simultaneous writes to one group; 20 copies of one request; 10 simultaneous edits; ordering under a held commit; leaving while an expense naming you is saved | Done |
+| Crashes | Kill the API process mid-write repeatedly, retry with the same keys; count duplicates and losses | Done: 800 of 800, 0 lost, 0 duplicated, 15 kills ([PERFORMANCE.md](PERFORMANCE.md)); a smaller run in CI |
+| Load | Rising concurrency against the API on Node and Postgres: requests/s, p50/p95/p99, server CPU per request | Done ([PERFORMANCE.md](PERFORMANCE.md)) |
 | App | Playwright: add, edit, settle, and the offline outbox | Phase 3 |
 
 ## 13. Operations
@@ -344,7 +344,7 @@ Limits to know about:
 | 1 | Database schema, migrations, write paths, integration tests | Done |
 | 2 | API: auth, groups, members, invites, expenses, payments, settle-up, change feed | Built and tested; deploying is the last step (docs/DEPLOY.md) |
 | 3 | Web app: installable, offline outbox | Built and tested end to end; on your phone for feedback |
-| 4 | Concurrency, crash and load tests | Numbers published in the README |
+| 4 | Concurrency, crash and load tests | Done: [PERFORMANCE.md](PERFORMANCE.md) |
 | 5 | Case study card on the portfolio | Live |
 
 ## 15. Open questions
