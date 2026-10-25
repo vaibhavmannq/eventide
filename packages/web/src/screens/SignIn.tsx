@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { api } from '../lib/api.ts';
 import { providers } from '../lib/store.ts';
 
-/** Signed out. The night sea from the portfolio behind it, and one way in. */
+/** Signed out. The same night sky as the rest of the app, and one way in. */
 export function SignIn({ next = location.pathname + location.search }: { next?: string }) {
   const outcome = new URLSearchParams(location.search).get('signin');
   const p = providers.value;
@@ -10,7 +10,6 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
     `/api/auth/${provider}?next=${encodeURIComponent(next.startsWith('/?signin=') ? '/' : next)}`;
   return (
     <main class="signin">
-      <div class="signin-sky" aria-hidden="true" />
       <div class="signin-body">
         <p class="mono label">Split · settle · rest</p>
         <h1 class="name">Eventide</h1>
@@ -18,16 +17,6 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
         <p class="lede">
           Share costs with your flat, a trip or a dinner, and settle up in as few payments as possible.
         </p>
-        {outcome === 'failed' && (
-          <p class="notice notice-bad" role="alert">
-            Signing in didn’t work. Please try again.
-          </p>
-        )}
-        {outcome === 'invite-only' && (
-          <p class="notice notice-bad" role="alert">
-            Eventide is invite-only for now. Ask a friend in a group for an invite link, then open it to join.
-          </p>
-        )}
         <div class="actions">
           {p.github && (
             <a class="pill pill-solid" href={to('github')}>
@@ -40,6 +29,16 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
             </a>
           )}
         </div>
+        {outcome === 'failed' && (
+          <p class="notice notice-bad" role="alert">
+            Signing in didn’t work. Please try again.
+          </p>
+        )}
+        {outcome === 'invite-only' && (
+          <p class="notice notice-bad" role="alert">
+            Eventide is invite-only for now. Ask a friend in a group for an invite link, then open it to join.
+          </p>
+        )}
         {p.dev && <DevSignIn next={next} />}
         <p class="signin-footer">
           <a class="mono link" href="/privacy">
