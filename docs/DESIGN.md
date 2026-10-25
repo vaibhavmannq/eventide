@@ -1,6 +1,7 @@
 # Eventide — design
 
-Status: draft, 2026-10-25. The ledger core (§5) is built and tested; everything after it is the plan.
+Status: 2026-10-25. Built and tested: the ledger core (§5) and the database with its write paths (§6, §7).
+The API, the app and the load tests are still the plan.
 
 ---
 
@@ -174,30 +175,35 @@ with the rate stored, never as a silent recalculation.
 
 ## 6. Data model
 
+The schema is [`0001_ledger.sql`](../packages/db/migrations/0001_ledger.sql); roles and commands are in
+[DATABASE.md](DATABASE.md).
+
 ```sql
-users        (id uuid pk, email text unique, name text, created_at)
-groups       (id uuid pk, name text, default_currency char(3), seq bigint not null default 0, created_at)
-members      (id uuid pk, group_id fk, display_name text, user_id uuid null fk,  -- null: no account yet
-              role text, joined_at, left_at)
-expenses     (id uuid pk, group_id fk, revision int, deleted boolean,         -- the current state, for reading
-              description text, occurred_on date, currency char(3), total bigint,
-              paid_by jsonb, split jsonb, created_by fk, updated_at)
-entries      (id uuid pk, group_id fk, seq bigint, kind text,                 -- one per ledger event, append-only
-              expense_id uuid null, revision int null, created_by fk, created_at,
-              unique (group_id, seq))
-postings     (entry_id fk, group_id fk, member_id fk, currency char(3), amount bigint)  -- append-only
-idempotency  (user_id, key uuid, request_hash bytea, response jsonb, created_at, primary key (user_id, key))
-invites      (token_hash bytea pk, group_id fk, expires_at, created_by)
-sessions     (id_hash bytea pk, user_id fk, expires_at)
+users                 (id, email unique, name, created_at)
+groups                (id, name, default_currency, seq, created_by, created_at)
+members               (id, group_id, display_name, user_id null, role, joined_at, left_at)  -- user_id null: no account yet
+transactions          (id, group_id, kind, revision, deleted, description, occurred_on, currency, body jsonb, ...)
+entries               (id, group_id, seq, kind create|edit|delete, transaction_id, revision, created_by, created_at)
+transaction_revisions (transaction_id, revision, entry_id, deleted, description, occurred_on, currency, body)
+postings              (id, entry_id, group_id, member_id, currency, amount bigint)
+idempotency_keys      (user_id, key, request_hash, response jsonb, created_at)
 ```
 
 - **`members` is separate from `users`** so you can split with someone before they sign up.
-- **`postings` is the ledger; `expenses` is a convenience view of the latest version.** Both are written in the
-  same transaction.
-- **Balances** start as `select member_id, currency, sum(amount) from postings where group_id = $1 group by …`
-  on an index over `(group_id)`. A group with ten thousand postings sums in well under a millisecond. If the load
-  test says otherwise, a `balances` table updated in the same transaction is the next step, not before.
-- Tokens (sessions, invites) are stored hashed, so a database leak does not hand out working links.
+- **`postings` is the ledger.** `transactions` is the current version of each expense or payment, for reading;
+  `transaction_revisions` keeps every version; `entries` is one row per change, numbered by the group's `seq`.
+  All of them are written in the same database transaction.
+- **`entries`, `transaction_revisions` and `postings` are append-only**, enforced by triggers that stop even the
+  owner, and by the API's role having no `UPDATE` or `DELETE` on them.
+- **Postings reference `(group_id, member_id)` and `(group_id, entry_id)`**, so a posting can never point into
+  another group.
+- **Balances** are `select member_id, currency, sum(amount) from postings where group_id = $1 group by …`, read
+  from a covering index `(group_id, currency, member_id) include (amount)`. If the load test says that is too slow,
+  a `balances` table updated in the same transaction is the next step, not before.
+- **Edits reverse what was written.** An edit's reversal is read from the postings actually stored for that
+  transaction, not recomputed from its body, so a future change to the splitting rules can never make a
+  reversal undo the wrong amount. There is a test that tampers with the body to prove it.
+- Sessions and invites arrive with the API (phase 2), in their own migration.
 
 ## 7. Writes: consistency and concurrency
 
@@ -217,6 +223,14 @@ Every write is one Postgres transaction:
 4. **Postings are inserted**, and the deferred trigger checks they balance at commit.
 
 Adding expenses never conflicts: postings only add up, and addition does not care about order.
+
+Each claim in this section has a test against real Postgres with real concurrent connections
+([`concurrency.db.test.ts`](../packages/db/tests/concurrency.db.test.ts)): 50 simultaneous writes to one group all
+land, numbered 1 to 50 with no gaps; one request sent 20 times at once is applied once; of 10 simultaneous edits
+of the same version, exactly one wins and nine get CONFLICT. The ordering guarantee is tested deterministically,
+not by hoping for an unlucky interleaving: one write is held just before its commit while a second is started,
+and the second must not become visible first. Replacing the row lock with a plain Postgres sequence makes that
+test fail, which is how we know it tests the right thing.
 
 Why the per-group sequence and not a global `bigserial`: sequence values are handed out at insert time but
 become visible at commit time, so a reader can see 12 and 14 before 13 commits, store "seen up to 14", and miss
@@ -284,9 +298,9 @@ Limits to know about:
 | Layer | What | Status |
 |---|---|---|
 | Ledger | Unit tests and property tests (fast-check): splits add up, postings balance, settle-up clears everything and matches brute force | Done |
-| Database | Integration tests against real Postgres: the zero-sum trigger rejects bad writes, postings cannot be updated | Phase 1 |
+| Database | Integration tests against real Postgres 16: the zero-sum trigger, append-only triggers, row-level security, migrations, idempotency, optimistic edits, the change feed | Done (37 tests) |
 | API | Request-level tests: auth, membership checks, idempotency, 409 on stale edits | Phase 2 |
-| Concurrency | 50 clients writing to one group at once; afterwards every balance sums to zero and every write is present exactly once | Phase 4 |
+| Concurrency | 50 simultaneous writes to one group; 20 copies of one request; 10 simultaneous edits; ordering under a held commit | Done at the database layer; repeated through the API in phase 4 |
 | Crashes | Kill the API process mid-write repeatedly, retry with the same keys; count duplicates and losses (target: 0 and 0) | Phase 4 |
 | Load | k6 against a local stack: requests/second and p95 latency at increasing load | Phase 4 |
 | App | Playwright: add, edit, settle, and the offline outbox | Phase 3 |
@@ -302,8 +316,8 @@ Limits to know about:
 
 | Phase | What | Done when |
 |---|---|---|
-| 0 | Design, ledger core | Tests pass, this document reviewed |
-| 1 | Database schema, migrations, integration tests | Trigger and permissions proven by tests |
+| 0 | Design, ledger core | Done |
+| 1 | Database schema, migrations, write paths, integration tests | Done |
 | 2 | API: auth, groups, members, expenses, payments, settle-up, change feed | Deployed to Workers, talking to Neon |
 | 3 | Web app: installable, offline outbox | Usable on a phone |
 | 4 | Concurrency, crash and load tests | Numbers published in the README |
