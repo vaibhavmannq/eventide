@@ -19,6 +19,7 @@ export interface Member {
   displayName: string;
   userId: string | null;
   role: 'owner' | 'member';
+  leftAt?: string | null;
 }
 
 export interface Group {
@@ -178,6 +179,8 @@ export function sync(): Promise<void> {
 
 async function refreshGroups(): Promise<void> {
   const { groups: list } = await api<{ groups: Omit<Group, 'members'>[] }>('GET', '/groups');
+  // A group deleted or left on another device is no longer listed: forget it here too.
+  for (const id of groupIds.value) if (!list.some((g) => g.id === id)) await forget(id);
   groupIds.value = list.map((g) => g.id);
   await idb.set('groups', groupIds.value);
   await Promise.all(list.map((g) => refreshGroup(g.id)));
@@ -359,6 +362,34 @@ export async function createGroup(input: { name: string; currency: string; displ
 
 export async function addMember(groupId: string, displayName: string): Promise<void> {
   await api('POST', `/groups/${groupId}/members`, { body: { displayName } });
+  await refreshGroup(groupId);
+}
+
+/** Removes the group from this device after it was deleted or left. */
+async function forget(groupId: string): Promise<void> {
+  const { [groupId]: _gone, ...rest } = groups.value;
+  groups.value = rest;
+  groupIds.value = groupIds.value.filter((id) => id !== groupId);
+  outbox.value = outbox.value.filter((i) => i.groupId !== groupId);
+  await Promise.all([
+    idb.set('groups', groupIds.value),
+    idb.set('outbox', outbox.value),
+    idb.set(`group:${groupId}`, undefined),
+  ]);
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  await api('DELETE', `/groups/${groupId}`);
+  await forget(groupId);
+}
+
+export async function leaveGroup(groupId: string): Promise<void> {
+  await api('POST', `/groups/${groupId}/leave`);
+  await forget(groupId);
+}
+
+export async function removeMember(groupId: string, memberId: string): Promise<void> {
+  await api('DELETE', `/groups/${groupId}/members/${memberId}`);
   await refreshGroup(groupId);
 }
 

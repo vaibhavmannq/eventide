@@ -1,4 +1,4 @@
-import { asUser, type Pool } from './connection.ts';
+import { asUser, type Pool, type Queryable } from './connection.ts';
 import { StoreError } from './errors.ts';
 import type { Member, User } from './store.ts';
 import { newToken, one, sha256 } from './util.ts';
@@ -78,9 +78,10 @@ export async function getGroup(pool: Pool, userId: string, groupId: string): Pro
     );
     const group = rows[0];
     if (!group) throw new StoreError('NOT_FOUND', 'No such group');
+    // Everyone who was ever in the group, so history can still name people who left; `leftAt` tells them apart.
     const members = await sql.query<Member>(
-      `select id, display_name as "displayName", user_id as "userId", role from members
-       where group_id = $1 and left_at is null order by joined_at, id`,
+      `select id, display_name as "displayName", user_id as "userId", role, left_at as "leftAt" from members
+       where group_id = $1 order by joined_at, id`,
       [groupId],
     );
     return { ...group, members: members.rows };
@@ -176,4 +177,63 @@ export async function nightly(
   } finally {
     client.release();
   }
+}
+
+/** Deletes a group for everyone. Only the person who started it can; its ledger stays in the database. */
+export async function deleteGroup(pool: Pool, userId: string, groupId: string): Promise<void> {
+  await asUser(pool, userId, async (sql) => {
+    const me = await lockAndFindMe(sql, groupId);
+    if (me.role !== 'owner') throw new StoreError('FORBIDDEN', 'Only the person who started the group can delete it');
+    await sql.query('update groups set deleted_at = now() where id = $1', [groupId]);
+  });
+}
+
+/** Leaves a group. Only at a zero balance in every currency, so nobody's debt disappears with them. */
+export async function leaveGroup(pool: Pool, userId: string, groupId: string): Promise<void> {
+  await asUser(pool, userId, async (sql) => {
+    const me = await lockAndFindMe(sql, groupId);
+    await assertSettled(sql, groupId, me.id, 'You still owe or are owed money here. Settle up first.');
+    await sql.query('update members set left_at = now() where id = $1', [me.id]);
+  });
+}
+
+/**
+ * Removes someone from a group: the person who started it can remove anyone, and anyone can remove a place
+ * made by name that nobody has claimed. Again only at a zero balance.
+ */
+export async function removeMember(pool: Pool, userId: string, groupId: string, memberId: string): Promise<void> {
+  await asUser(pool, userId, async (sql) => {
+    const me = await lockAndFindMe(sql, groupId);
+    const { rows } = await sql.query<{ user_id: string | null }>(
+      'select user_id from members where id = $1 and group_id = $2 and left_at is null',
+      [memberId, groupId],
+    );
+    const target = rows[0];
+    if (!target) throw new StoreError('NOT_FOUND', 'No such member');
+    if (me.role !== 'owner' && target.user_id !== null) {
+      throw new StoreError('FORBIDDEN', 'Only the person who started the group can remove people who have joined');
+    }
+    await assertSettled(sql, groupId, memberId, 'They still owe or are owed money here. Settle up first.');
+    await sql.query('update members set left_at = now() where id = $1', [memberId]);
+  });
+}
+
+/** Takes the group's row lock (as every write does) and returns the caller's own membership. */
+async function lockAndFindMe(sql: Queryable, groupId: string): Promise<{ id: string; role: string }> {
+  const group = await sql.query('select 1 from groups where id = $1 for update', [groupId]);
+  if (group.rows.length === 0) throw new StoreError('NOT_FOUND', 'No such group');
+  const { rows } = await sql.query<{ id: string; role: string }>(
+    'select id, role from members where group_id = $1 and user_id = app_user_id() and left_at is null',
+    [groupId],
+  );
+  return one(rows);
+}
+
+async function assertSettled(sql: Queryable, groupId: string, memberId: string, message: string): Promise<void> {
+  const { rows } = await sql.query(
+    `select 1 from postings where group_id = $1 and member_id = $2
+     group by currency having sum(amount) <> 0 limit 1`,
+    [groupId, memberId],
+  );
+  if (rows.length > 0) throw new StoreError('NOT_SETTLED', message);
 }

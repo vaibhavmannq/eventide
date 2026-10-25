@@ -212,6 +212,10 @@ idempotency_keys      (user_id, key, request_hash, response jsonb, created_at)
 - **Edits reverse what was written.** An edit's reversal is read from the postings actually stored for that
   transaction, not recomputed from its body, so a future change to the splitting rules can never make a
   reversal undo the wrong amount. There is a test that tampers with the body to prove it.
+- **Leaving, removing, deleting** (migration 0003). Someone can leave, or be removed, only at a zero balance in
+  every currency, checked under the group's row lock, so a debt can never leave with a person. A group can be
+  deleted by the person who started it; that hides it from everyone (`groups.deleted_at`, enforced by row-level
+  security) while its ledger stays, append-only like everything else.
 - **`sessions` and `invites`** (migration 0002) store only SHA-256 hashes of their tokens. Joining by invite and
   claiming a place made by name ("I'm Sam") run as security-definer functions, because the person joining
   cannot yet see the group.

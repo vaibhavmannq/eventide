@@ -24,6 +24,8 @@ const STORE_STATUS: Record<StoreError['code'], ContentfulStatusCode> = {
   IDEMPOTENCY_MISMATCH: 422,
   UNKNOWN_MEMBER: 422,
   KIND_MISMATCH: 422,
+  FORBIDDEN: 403,
+  NOT_SETTLED: 409,
 };
 
 /**

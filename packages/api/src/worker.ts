@@ -38,32 +38,45 @@ function configFrom(env: Env): Config {
   };
 }
 
-/** A pool per request, as Hyperdrive recommends: Hyperdrive does the real pooling, and Workers share nothing. */
+/**
+ * A pool per request, as Hyperdrive recommends: Hyperdrive does the real pooling, and Workers share nothing.
+ * Closing it after the response makes the Workers runtime report each closed socket as an error; those are
+ * expected and dropped, so the log only shows errors that happened while the request was being served.
+ */
 function poolFor(env: Env) {
   const pool = new pg.Pool({ connectionString: env.HYPERDRIVE.connectionString, max: 5 });
-  pool.on('error', (error) => console.error(JSON.stringify({ level: 'error', event: 'pool', error: String(error) })));
-  return pool;
+  let closing = false;
+  pool.on('error', (error) => {
+    if (!closing) console.error(JSON.stringify({ level: 'error', event: 'pool', error: String(error) }));
+  });
+  return {
+    pool,
+    close: () => {
+      closing = true;
+      return pool.end();
+    },
+  };
 }
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const pool = poolFor(env);
+    const { pool, close } = poolFor(env);
     try {
       return await app.fetch(request, { db: pool, config: configFrom(env) }, ctx as never);
     } finally {
-      ctx.waitUntil(pool.end());
+      ctx.waitUntil(close());
     }
   },
 
   /** Nightly (wrangler.jsonc, `triggers`): audit every ledger, purge expired sessions, invites and keys. */
   async scheduled(_controller: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
-    const pool = poolFor(env);
+    const { pool, close } = poolFor(env);
     try {
       const result = await nightly(pool);
       const level = result.unbalanced.length > 0 ? 'error' : 'info';
       console.log(JSON.stringify({ level, event: 'nightly', ...result }));
     } finally {
-      ctx.waitUntil(pool.end());
+      ctx.waitUntil(close());
     }
   },
 };

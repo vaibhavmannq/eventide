@@ -10,7 +10,11 @@ export type StoreErrorCode =
   /** The transaction names someone who is not an active member of the group. */
   | 'UNKNOWN_MEMBER'
   /** An edit tried to turn an expense into a payment or the other way round. */
-  | 'KIND_MISMATCH';
+  | 'KIND_MISMATCH'
+  /** Only the person who started the group can do this. */
+  | 'FORBIDDEN'
+  /** Someone still owes or is owed money in this group, so they cannot leave or be removed yet. */
+  | 'NOT_SETTLED';
 
 export class StoreError extends Error {
   readonly code: StoreErrorCode;

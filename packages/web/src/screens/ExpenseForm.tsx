@@ -1,5 +1,4 @@
 import {
-  CURRENCY_EXPONENTS,
   type Expense,
   formatAmount,
   LedgerError,
@@ -11,6 +10,7 @@ import {
 } from '@eventide/ledger';
 import { useState } from 'preact/hooks';
 import { Header } from '../components/Header.tsx';
+import { currencies } from '../lib/currency.ts';
 import { money, today } from '../lib/money.ts';
 import { go } from '../lib/router.ts';
 import { edit, groups, myMemberId, record, remove, shownTransactions } from '../lib/store.ts';
@@ -49,7 +49,10 @@ function Form({
   existing?: { id: string; description: string; occurredOn: string; transaction: Expense } & Parameters<typeof edit>[0];
 }) {
   const cache = groups.value[groupId];
-  const members = cache?.group.members ?? [];
+  const start0 = existing?.transaction;
+  // Current members, plus anyone who has since left but is part of the expense being edited.
+  const named = new Set(start0 ? [...start0.paidBy.map((p) => p.member), ...splitMembers(start0.split)] : []);
+  const members = (cache?.group.members ?? []).filter((m) => !m.leftAt || named.has(m.id));
   const mine = myMemberId(cache?.group) ?? members[0]?.id ?? '';
   const start = existing?.transaction;
   const startSplit = start?.split;
@@ -170,8 +173,10 @@ function Form({
             <label class="field currency-field">
               <span class="mono">Currency</span>
               <select value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
-                {Object.keys(CURRENCY_EXPONENTS).map((code) => (
-                  <option key={code}>{code}</option>
+                {currencies.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -206,11 +211,11 @@ function Form({
 
           <fieldset class="field">
             <legend class="mono">Split</legend>
-            <div class="segmented">
+            <div class="modes mono">
               {(['equal', 'exact', 'shares'] as const).map((m) => (
                 <label key={m} class={mode === m ? 'on' : ''}>
                   <input type="radio" name="split-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
-                  {m === 'equal' ? 'Equally' : m === 'exact' ? 'Exact amounts' : 'By shares'}
+                  {m === 'equal' ? 'Equally' : m === 'exact' ? 'Exact' : 'Shares'}
                 </label>
               ))}
             </div>
@@ -256,7 +261,7 @@ function Form({
                         onInput={(e) => setShares({ ...shares, [m.id]: e.currentTarget.value })}
                       />
                     )}
-                    <span class="amount muted">{share ? money(share, currency) : '—'}</span>
+                    <span class="amount muted share-preview">{share ? money(share, currency) : '—'}</span>
                   </li>
                 );
               })}
@@ -325,4 +330,10 @@ function PaymentView({ groupId, id }: { groupId: string; id: string }) {
       </main>
     </>
   );
+}
+
+function splitMembers(split: SplitSpec): string[] {
+  if (split.kind === 'equal') return [...split.members];
+  if (split.kind === 'exact') return split.amounts.map((a) => a.member);
+  return split.parts.map((p) => p.member);
 }

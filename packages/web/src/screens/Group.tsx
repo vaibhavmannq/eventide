@@ -37,7 +37,8 @@ export function GroupScreen({ id }: { id: string }) {
   }
   const { group } = cache;
   const names = new Map(group.members.map((m) => [m.id, m.displayName]));
-  const name = (memberId: string) => names.get(memberId) ?? 'Someone who left';
+  const name = (memberId: string) => names.get(memberId) ?? 'Someone';
+  const active = group.members.filter((m) => !m.leftAt);
   const mine = myMemberId(group);
   const shown = shownTransactions(id);
   const summaries = summarise(id);
@@ -51,7 +52,7 @@ export function GroupScreen({ id }: { id: string }) {
         <div class="group-head">
           <div>
             <p class="mono label">
-              {group.members.length} {group.members.length === 1 ? 'person' : 'people'} · {group.defaultCurrency}
+              {active.length} {active.length === 1 ? 'person' : 'people'} · {group.defaultCurrency}
             </p>
             <h1 class="title">{group.name}</h1>
           </div>
@@ -61,8 +62,11 @@ export function GroupScreen({ id }: { id: string }) {
         </div>
 
         <div class="group-columns">
-          <section class="summary" aria-label="Where you stand">
-            <div class="card summary-card">
+          <section class="summary" aria-labelledby="where">
+            <h2 class="mono label" id="where">
+              I · Where you stand
+            </h2>
+            <div class="standing-block">
               <Moon lit={s.lit} size={72} label={s.lit === 1 ? 'Full moon: everyone is even' : undefined} />
               <div>
                 <p class={`standing-big standing-${s.tone}`}>{s.text}</p>
@@ -71,8 +75,8 @@ export function GroupScreen({ id }: { id: string }) {
             </div>
 
             {summaries.some((x) => x.settleUp.length > 0) && (
-              <div class="settle">
-                <h2 class="mono label">Settle up</h2>
+              <div class="section">
+                <h2 class="mono label">II · Settle up</h2>
                 <ul class="settle-list">
                   {summaries.flatMap((x) =>
                     x.settleUp.map((t) => (
@@ -84,7 +88,7 @@ export function GroupScreen({ id }: { id: string }) {
                         <span class="amount">{money(t.amount, x.currency)}</span>
                         <button
                           type="button"
-                          class="pill pill-small"
+                          class="mono link"
                           onClick={() =>
                             void record(id, {
                               description: '',
@@ -99,7 +103,7 @@ export function GroupScreen({ id }: { id: string }) {
                             })
                           }
                         >
-                          Mark paid
+                          Mark paid →
                         </button>
                       </li>
                     )),
@@ -113,8 +117,10 @@ export function GroupScreen({ id }: { id: string }) {
             )}
           </section>
 
-          <section class="activity" aria-label="Activity">
-            <h2 class="mono label">Activity</h2>
+          <section class="activity section" aria-labelledby="activity">
+            <h2 class="mono label" id="activity">
+              {summaries.some((x) => x.settleUp.length > 0) ? 'III' : 'II'} · Activity
+            </h2>
             {failed.length > 0 && (
               <ul class="failed-list">
                 {failed.map((item) => (

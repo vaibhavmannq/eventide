@@ -4,13 +4,16 @@ import {
   changesSince,
   createGroup,
   createInvite,
+  deleteGroup,
   deleteTransaction,
   editTransaction,
   getBalances,
   getGroup,
+  leaveGroup,
   listGroups,
   previewInvite,
   recordTransaction,
+  removeMember,
 } from '@eventide/db';
 import { settleUp } from '@eventide/ledger';
 import { Hono } from 'hono';
@@ -48,6 +51,28 @@ export const routes = new Hono<AppEnv>()
   .get('/groups/:groupId', async (c) => {
     const id = groupId.parse(c.req.param('groupId'));
     return c.json({ group: await getGroup(c.env.db, c.get('user').id, id) });
+  })
+
+  /** Hides the group for everyone; only its creator can. The ledger itself is kept. */
+  .delete('/groups/:groupId', async (c) => {
+    await deleteGroup(c.env.db, c.get('user').id, groupId.parse(c.req.param('groupId')));
+    return c.body(null, 204);
+  })
+
+  /** Leave a group; refused with 409 NOT_SETTLED until your balance is zero. */
+  .post('/groups/:groupId/leave', async (c) => {
+    await leaveGroup(c.env.db, c.get('user').id, groupId.parse(c.req.param('groupId')));
+    return c.body(null, 204);
+  })
+
+  .delete('/groups/:groupId/members/:memberId', async (c) => {
+    await removeMember(
+      c.env.db,
+      c.get('user').id,
+      groupId.parse(c.req.param('groupId')),
+      groupId.parse(c.req.param('memberId')),
+    );
+    return c.body(null, 204);
   })
 
   .post('/groups/:groupId/members', async (c) => {
