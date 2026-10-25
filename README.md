@@ -6,10 +6,8 @@ Eventide is a portfolio project about getting an ordinary thing exactly right: m
 penny, many people editing one group at once, phones that go offline, and every reliability claim backed by a
 test or a measurement. It runs entirely on free tiers.
 
-**Status:** phases 0–2 of 5 are built and tested: the ledger core, the Postgres database, and the API (sign-in,
-groups, invites, expenses, settle-up). Deploying it is the next step ([docs/DEPLOY.md](docs/DEPLOY.md)); the app
-comes after.
-See the [design](docs/DESIGN.md) for the whole plan.
+**Status:** live at https://eventide.vaibhavmann-10.workers.dev. Phases 0–3 of 5 are built: the ledger core, the
+Postgres database, the API, and the app (installable, works offline). Load and crash tests are next.
 
 ## What's here
 
@@ -21,6 +19,7 @@ See the [design](docs/DESIGN.md) for the whole plan.
 | [`packages/ledger`](packages/ledger/src) | The money rules as pure TypeScript: splitting, double-entry postings, balances, settle-up |
 | [`packages/db`](packages/db) | Schema, migrations, and every read and write, each in one transaction |
 | [`packages/api`](packages/api) | The HTTP API (Hono) and the Cloudflare Worker that serves it and the app |
+| [`packages/web`](packages/web) | The app: Preact, about 20 KB of script, installable, offline-first with an outbox |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | Putting it online on free tiers, step by step |
 | [`scripts/bench-settle.ts`](scripts/bench-settle.ts) | The benchmark that sets how far settle-up searches exactly |
 
@@ -56,6 +55,15 @@ settle-up.
   `Idempotency-Key`. A retry gets back the same bytes.
 - Tested with real HTTP requests against Postgres, and on the real Workers runtime with `wrangler dev`.
 
+## The app in brief
+
+- Changes are saved on the device first and sent with their Idempotency-Key when there is a connection, so an
+  expense added on a plane is not lost and is never recorded twice.
+- Balances and settle-up are computed on the phone with the same ledger code the server uses.
+- The moon on each group fills as its debts are settled; full means everyone is even.
+- End-to-end tests drive real browsers at phone and laptop sizes against the real Workers runtime: two flatmates
+  join by invite, split a dinner and settle up; an expense added offline syncs once; edits and deletes.
+
 ## Running it
 
 Needs Node 22 or later.
@@ -67,9 +75,10 @@ npm run typecheck
 npm run check       # Biome lint and format
 npm run test:db     # integration and API tests against Postgres (see docs/DATABASE.md)
 
-# The Worker locally (real Workers runtime), against a local Postgres:
+# The app and the Worker locally (real Workers runtime), against a local Postgres:
 cp packages/api/.dev.vars.example packages/api/.dev.vars
-npm run dev -w @eventide/api
+npm run dev                # builds the app, serves everything on http://127.0.0.1:8787
+npm run e2e                # end-to-end tests in Chromium, phone and laptop sizes
 node --experimental-strip-types scripts/smoke.ts http://localhost:8787
 node --experimental-strip-types scripts/bench-settle.ts
 ```

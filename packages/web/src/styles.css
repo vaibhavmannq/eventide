@@ -1,0 +1,764 @@
+/* Eventide. The portfolio's night (tokens and type from vaibhavmannq.github.io), made calm enough to use every day:
+   the same ink, glow and fonts, without the scene behind every page. Dark only, like the portfolio. */
+
+@font-face {
+  font-family: Satoshi;
+  src: url("/fonts/satoshi-300.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: Satoshi;
+  src: url("/fonts/satoshi-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Satoshi;
+  src: url("/fonts/satoshi-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: Fraunces;
+  src: url("/fonts/fraunces-var-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: Fraunces;
+  src: url("/fonts/fraunces-italic-var-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --night: #020406;
+  --deep: #071014;
+  --sea: #0e1c21;
+  --ink: #e6eef0;
+  --ink-dim: rgba(230, 238, 240, 0.78);
+  --ink-faint: rgba(230, 238, 240, 0.55);
+  --line: rgba(230, 238, 240, 0.12);
+  --glow: #9fe6ee;
+  --warm: #f1cf9a;
+  --bad: #f4a99c;
+  --card: rgba(16, 30, 35, 0.62);
+  --font-body: Satoshi, "Segoe UI", system-ui, sans-serif;
+  --font-name: Fraunces, Georgia, "Times New Roman", serif;
+  --font-mono: "Space Mono", "Cascadia Mono", ui-monospace, monospace;
+  --gutter: clamp(16px, 4vw, 40px);
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: radial-gradient(120% 70% at 75% -10%, #1c3a42 0%, var(--deep) 45%, var(--night) 100%) fixed;
+  background-color: var(--night);
+  color: var(--ink);
+  font: 400 1rem / 1.55 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--glow);
+  outline-offset: 3px;
+}
+
+/* ─── Type ─────────────────────────────────────────────────────────────────── */
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.label {
+  color: var(--glow);
+  margin: 0 0 0.6rem;
+}
+
+.name {
+  font-family: var(--font-name);
+  font-weight: 300;
+  font-size: clamp(3.4rem, 15vw, 6.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.title {
+  font-family: var(--font-name);
+  font-weight: 300;
+  font-size: clamp(2rem, 8vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.5rem;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  font-family: var(--font-name);
+  font-weight: 400;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.tagline {
+  font-family: var(--font-name);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.4rem, 5vw, 1.9rem);
+  margin: 0.6rem 0 0;
+}
+
+.lede {
+  color: var(--ink-dim);
+  font-weight: 300;
+  font-size: 1.1rem;
+  max-width: 34ch;
+}
+
+.muted {
+  color: var(--ink-faint);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: max(14px, env(safe-area-inset-top)) var(--gutter) 14px;
+  background: linear-gradient(to bottom, rgba(2, 4, 6, 0.92), rgba(2, 4, 6, 0.6) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.brand,
+.link {
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 6px 0;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.link:hover,
+.brand:hover {
+  color: var(--glow);
+}
+
+.status {
+  color: var(--ink-faint);
+}
+
+.status-bad {
+  color: var(--bad);
+}
+
+.page {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem var(--gutter) 9rem; /* room to scroll the last row clear of the Add expense button */
+}
+
+.narrow {
+  max-width: 560px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* ─── Pills and cards ──────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 238, 240, 0.35);
+  background: rgba(2, 4, 6, 0.35);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.pill:hover {
+  border-color: var(--glow);
+}
+
+.pill-solid {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--night);
+  font-weight: 500;
+}
+
+.pill-solid:hover {
+  background: #fff;
+}
+
+.pill-small {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+}
+
+.pill-danger {
+  border-color: rgba(244, 169, 156, 0.5);
+  color: var(--bad);
+}
+
+.pill:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+  backdrop-filter: blur(14px);
+}
+
+.cards {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.notice {
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.notice-bad {
+  color: var(--bad);
+  background: rgba(244, 169, 156, 0.08);
+  border: 1px solid rgba(244, 169, 156, 0.25);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.tag {
+  font-size: 0.62rem;
+  color: var(--glow);
+  margin-left: 0.6rem;
+}
+
+.tag-bad {
+  color: var(--bad);
+}
+
+/* ─── Moon ─────────────────────────────────────────────────────────────────── */
+
+.moon {
+  flex: none;
+  overflow: visible; /* the glow reaches past the edge of the drawing; clipped, it shows as a faint square */
+}
+
+.moon-dark {
+  fill: rgba(230, 238, 240, 0.08);
+  stroke: rgba(230, 238, 240, 0.35);
+  stroke-width: 1;
+}
+
+.moon-lit {
+  fill: #f2f6f4;
+  filter: drop-shadow(0 0 6px rgba(242, 246, 244, 0.45));
+}
+
+/* ─── Sign in ──────────────────────────────────────────────────────────────── */
+
+.signin {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: flex-end;
+  padding: var(--gutter);
+  padding-bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+.signin-sky {
+  position: absolute;
+  inset: 0;
+  background: url("/night.jpg") center 30% / cover no-repeat;
+}
+
+.signin-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(2, 4, 6, 0.1) 0%, rgba(2, 4, 6, 0.35) 40%, rgba(2, 4, 6, 0.94) 72%);
+}
+
+.signin-body {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto 4vh;
+}
+
+.dev-signin {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* ─── Groups ───────────────────────────────────────────────────────────────── */
+
+.group-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+
+.group-card:hover {
+  border-color: rgba(159, 230, 238, 0.4);
+}
+
+.group-card-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.group-name {
+  font-family: var(--font-name);
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.chevron {
+  color: var(--ink-faint);
+}
+
+.standing-owed {
+  color: var(--glow);
+}
+
+.standing-owe {
+  color: var(--warm);
+}
+
+.standing-even {
+  color: var(--ink-dim);
+}
+
+.empty {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  color: var(--ink-dim);
+  max-width: 40ch;
+}
+
+/* ─── A group ──────────────────────────────────────────────────────────────── */
+
+.group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.group-columns {
+  display: grid;
+  gap: 2rem;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.standing-big {
+  font-family: var(--font-name);
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 300;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.settle {
+  margin-top: 1.5rem;
+}
+
+.settle-list,
+.rows,
+.days,
+.people,
+.split-list,
+.failed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.settle-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "who amount" "button button";
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settle-row > span:first-child {
+  grid-area: who;
+}
+
+.settle-row > .amount {
+  grid-area: amount;
+}
+
+.settle-row > button {
+  grid-area: button;
+  justify-self: start;
+}
+
+.day {
+  color: var(--ink-faint);
+  margin: 1.4rem 0 0.4rem;
+  font-size: 0.68rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+}
+
+.row-main {
+  display: grid;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.row:hover .row-title {
+  color: var(--glow);
+}
+
+.row-sub {
+  color: var(--ink-faint);
+  font-size: 0.875rem;
+}
+
+.share {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+  flex: none;
+}
+
+.share .mono {
+  font-size: 0.6rem;
+}
+
+.share-owed {
+  color: var(--glow);
+}
+
+.share-owe {
+  color: var(--warm);
+}
+
+.share-none {
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+}
+
+.fab {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 1rem var(--gutter) max(1rem, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(2, 4, 6, 0.95), rgba(2, 4, 6, 0.7) 60%, transparent);
+  pointer-events: none;
+}
+
+.fab .pill {
+  pointer-events: auto;
+  box-shadow: 0 10px 40px rgba(159, 230, 238, 0.15);
+}
+
+.person {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.people {
+  margin-bottom: 2rem;
+}
+
+.link-box {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(2, 4, 6, 0.5);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+form.card {
+  margin-top: 1rem;
+}
+
+/* ─── Forms ────────────────────────────────────────────────────────────────── */
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.field > .mono,
+.field > legend {
+  color: var(--ink-faint);
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(2, 4, 6, 0.55);
+  font-size: 1rem;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--glow);
+  outline: none;
+}
+
+.amount-row {
+  display: grid;
+  grid-template-columns: 1fr 7rem;
+  gap: 0.75rem;
+}
+
+.field .amount-input {
+  min-height: 72px;
+  font-family: var(--font-name);
+  font-weight: 300;
+  font-size: 2.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.segmented label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* The real radio stays in the page for keyboards and screen readers; the label is what you see. */
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--glow);
+  outline-offset: 2px;
+}
+
+.segmented label.on {
+  background: var(--ink);
+  color: var(--night);
+  font-weight: 500;
+}
+
+.split-list {
+  margin-top: 0.5rem;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.check input {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  accent-color: var(--glow);
+}
+
+.field .small-input {
+  width: 6.5rem;
+  min-height: 40px;
+  text-align: right;
+}
+
+/* ─── Laptop ───────────────────────────────────────────────────────────────── */
+
+@media (min-width: 900px) {
+  .group-columns {
+    grid-template-columns: minmax(300px, 380px) 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .summary {
+    position: sticky;
+    top: 5rem;
+  }
+
+  .cards {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+
+  .fab {
+    justify-content: flex-end;
+    background: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    /* biome-ignore lint/complexity/noImportantStyles: a user preference must beat every component's own transition */
+    transition: none !important;
+  }
+}

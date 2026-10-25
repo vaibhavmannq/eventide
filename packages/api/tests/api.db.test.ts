@@ -91,6 +91,10 @@ describe('the basics', () => {
     expect(cookie).not.toMatch(/Domain=/);
   });
 
+  it('tells the app which sign-in buttons to show', async () => {
+    expect((await call('GET', '/auth/providers')).json).toEqual({ github: false, google: false, dev: true });
+  });
+
   it('turns the development login off unless it is configured on', async () => {
     const off = await call('POST', '/auth/dev', {
       body: { email: 'x@example.com', name: 'X' },
