@@ -25,6 +25,11 @@ the tests would not exercise, and each request would open a fresh connection.
 **Placement in the database's region.** A write is about a dozen round trips to Postgres and one to the visitor,
 so the Worker runs next to the database (`placement.region` in wrangler.jsonc), not next to the visitor.
 
+**Hyperdrive's query cache is off.** It is on by default, keyed on the query text and parameters, and it knows
+nothing about row-level security (the user is set per transaction with `set_config`). A balance query cached for
+one user could be answered for another with the same group id, and cached reads are not invalidated by writes.
+Every read here is a cheap indexed query, so there is nothing worth the risk of caching.
+
 ## Consequences
 
 - Hyperdrive's free plan allows 100,000 queries a day, roughly 7,000 writes. If that is ever close, each write

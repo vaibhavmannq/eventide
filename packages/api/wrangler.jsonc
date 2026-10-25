@@ -24,9 +24,9 @@
     }
   ],
 
-  // Run the Worker next to the database, not next to the visitor: a write is several round trips to Postgres
-  // and only one to the visitor. Set to the Neon project's region once it exists, e.g. "aws:ap-southeast-1".
-  // "placement": { "region": "aws:..." },
+  // Run the Worker next to the database (Neon, AWS Singapore), not next to the visitor: a write is about a dozen
+  // round trips to Postgres and only one to the visitor.
+  "placement": { "region": "aws:ap-southeast-1" },
 
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
