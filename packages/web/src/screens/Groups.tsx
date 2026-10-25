@@ -1,5 +1,6 @@
 import { Header } from '../components/Header.tsx';
 import { Moon } from '../components/Moon.tsx';
+import { install, installed, installPrompt, onIphone } from '../lib/install.ts';
 import { money } from '../lib/money.ts';
 import { moonTonight } from '../lib/moonphase.ts';
 import { onLink } from '../lib/router.ts';
@@ -100,7 +101,17 @@ export function Groups() {
           <a class="pill pill-solid" href="/new" onClick={(e) => onLink(e, '/new')}>
             New group <span aria-hidden="true">+</span>
           </a>
+          {!installed.value && installPrompt.value && (
+            <button type="button" class="pill" onClick={() => void install()}>
+              Install Eventide
+            </button>
+          )}
         </div>
+        {!installed.value && !installPrompt.value && onIphone && (
+          <p class="muted small install-hint">
+            To install on iPhone: tap Share, then <strong>Add to Home Screen</strong>.
+          </p>
+        )}
       </main>
     </>
   );

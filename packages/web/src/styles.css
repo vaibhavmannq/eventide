@@ -498,6 +498,10 @@ select {
   color: var(--ink-dim);
 }
 
+.install-hint {
+  margin-top: 1.5rem;
+}
+
 .empty {
   display: flex;
   gap: 1.25rem;

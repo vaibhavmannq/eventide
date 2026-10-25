@@ -4,10 +4,10 @@ import { providers } from '../lib/store.ts';
 
 /** Signed out. The night sea from the portfolio behind it, and one way in. */
 export function SignIn({ next = location.pathname + location.search }: { next?: string }) {
-  const failed = new URLSearchParams(location.search).get('signin') === 'failed';
+  const outcome = new URLSearchParams(location.search).get('signin');
   const p = providers.value;
   const to = (provider: string) =>
-    `/api/auth/${provider}?next=${encodeURIComponent(next === '/?signin=failed' ? '/' : next)}`;
+    `/api/auth/${provider}?next=${encodeURIComponent(next.startsWith('/?signin=') ? '/' : next)}`;
   return (
     <main class="signin">
       <div class="signin-sky" aria-hidden="true" />
@@ -18,9 +18,14 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
         <p class="lede">
           Share costs with your flat, a trip or a dinner, and settle up in as few payments as possible.
         </p>
-        {failed && (
+        {outcome === 'failed' && (
           <p class="notice notice-bad" role="alert">
             Signing in didn’t work. Please try again.
+          </p>
+        )}
+        {outcome === 'invite-only' && (
+          <p class="notice notice-bad" role="alert">
+            Eventide is invite-only for now. Ask a friend in a group for an invite link, then open it to join.
           </p>
         )}
         <div class="actions">
@@ -50,7 +55,7 @@ function DevSignIn({ next }: { next: string }) {
       class="dev-signin"
       onSubmit={async (e) => {
         e.preventDefault();
-        await api('POST', '/auth/dev', { body: { email, name } });
+        await api('POST', '/auth/dev', { body: { email, name, next } });
         location.href = next;
       }}
     >

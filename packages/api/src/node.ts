@@ -29,6 +29,13 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
 const quiet = env.LOG === 'errors';
 const config: Config = {
   providers,
+  signups: {
+    open: env.SIGNUPS !== 'invite',
+    allowedEmails: (env.ALLOWED_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  },
   devLogin: env.DEV_LOGIN === 'true',
   fetch: (input, init) => fetch(input, init),
   log: (entry) => {

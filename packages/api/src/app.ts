@@ -1,7 +1,7 @@
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
-import { type AppEnv, auth, requireUser } from './auth.ts';
+import { type AppEnv, auth, requireUser, tooMany } from './auth.ts';
 import { HttpError, toHttpError } from './errors.ts';
 import { routes } from './routes.ts';
 
@@ -27,6 +27,16 @@ app.use(async (c, next) => {
     ms: Date.now() - started,
     user: c.var.user?.id,
   });
+});
+
+/**
+ * A cap per IP address on everything under /api, signed in or not: it also catches someone inventing session
+ * cookies to dodge the per-person cap (which requireUser applies once it knows who you are).
+ */
+app.use(async (c, next) => {
+  const ip = c.req.header('cf-connecting-ip');
+  if (ip && c.env.config.limit && !(await c.env.config.limit('ip', ip))) throw tooMany();
+  await next();
 });
 
 app.use(secureHeaders());
@@ -80,6 +90,7 @@ app.onError((error, c) => {
 });
 
 function errorResponse(c: Context<AppEnv>, http: HttpError) {
+  if (http.status === 429) c.header('Retry-After', '60');
   const body: { code: string; message: string; details?: unknown } = { code: http.code, message: http.message };
   if (http.details !== undefined) body.details = http.details;
   return c.json({ error: body }, http.status);

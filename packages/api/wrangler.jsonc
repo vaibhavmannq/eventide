@@ -28,6 +28,13 @@
   // round trips to Postgres and only one to the visitor.
   "placement": { "region": "aws:ap-southeast-1" },
 
+  // Abuse limits (free; they only count as the requests they guard). Generous for real people: a busy session is
+  // a few requests a minute. Approximate by design: counted per Cloudflare location, synced within seconds.
+  "ratelimits": [
+    { "name": "RL_IP", "namespace_id": "1001", "simple": { "limit": 300, "period": 60 } },
+    { "name": "RL_USER", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
+  ],
+
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
 }

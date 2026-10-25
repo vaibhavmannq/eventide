@@ -237,3 +237,25 @@ async function assertSettled(sql: Queryable, groupId: string, memberId: string, 
   );
   if (rows.length > 0) throw new StoreError('NOT_SETTLED', message);
 }
+
+/** Whether someone with this email already has an account (signing in again is always allowed). */
+export async function userExists(pool: Pool, email: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query('select 1 from users where email = lower($1)', [email]);
+    return rows.length > 0;
+  } finally {
+    client.release();
+  }
+}
+
+/** Whether an invite link is real and unexpired: what lets a new person create an account when sign-up is closed. */
+export async function inviteIsValid(pool: Pool, token: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query('select 1 from invite_preview($1) limit 1', [await sha256(token)]);
+    return rows.length > 0;
+  } finally {
+    client.release();
+  }
+}

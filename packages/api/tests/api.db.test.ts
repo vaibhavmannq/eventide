@@ -14,6 +14,7 @@ const logs: Record<string, unknown>[] = [];
 
 const config = (overrides: Partial<Config> = {}): Config => ({
   providers: {},
+  signups: { open: true, allowedEmails: [] },
   devLogin: true,
   fetch: () => Promise.reject(new Error('no network in tests')),
   log: (entry) => logs.push(entry),
@@ -410,5 +411,100 @@ describe('sign in with a provider', () => {
 
   it('says so when a provider is not set up', async () => {
     expect((await call('GET', '/auth/google', { config: withProvider(null) })).status).toBe(404);
+  });
+});
+
+describe('protecting the free allowances', () => {
+  const closed = (allowedEmails: string[] = []) => config({ signups: { open: false, allowedEmails } });
+
+  it('keeps strangers from creating accounts when sign-up is invite-only', async () => {
+    const response = await call('POST', '/auth/dev', {
+      body: { email: `stranger-${Date.now()}@example.com`, name: 'S' },
+      config: closed(),
+    });
+    expect(response).toMatchObject({ status: 403, json: { error: { code: 'INVITE_ONLY' } } });
+  });
+
+  it('lets in a listed email, anyone with a valid invite, and everyone who already has an account', async () => {
+    const owner = `owner-${Date.now()}@example.com`;
+    expect(
+      (await call('POST', '/auth/dev', { body: { email: owner.toUpperCase(), name: 'O' }, config: closed([owner]) }))
+        .status,
+    ).toBe(200);
+
+    const host = await signIn(`host-${Date.now()}@example.com`, 'Host');
+    const group = await call('POST', '/groups', {
+      cookie: host,
+      body: { name: 'G', currency: 'INR', displayName: 'H' },
+    });
+    const invite = await call('POST', `/groups/${group.json.group.id}/invites`, { cookie: host });
+    const friend = `friend-${Date.now()}@example.com`;
+    const withInvite = await call('POST', '/auth/dev', {
+      body: { email: friend, name: 'F', next: `/join/${invite.json.invite.token}` },
+      config: closed(),
+    });
+    expect(withInvite.status).toBe(200);
+    const forged = await call('POST', '/auth/dev', {
+      body: { email: `forger-${Date.now()}@example.com`, name: 'F', next: '/join/not-a-real-token' },
+      config: closed(),
+    });
+    expect(forged.status).toBe(403);
+
+    // The friend now has an account, so they can sign in again later without the invite.
+    expect((await call('POST', '/auth/dev', { body: { email: friend, name: 'F' }, config: closed() })).status).toBe(
+      200,
+    );
+  });
+
+  it('sends a stranger signing in with a provider back with an explanation', async () => {
+    const provider: OAuthProvider = {
+      clientId: 'c',
+      clientSecret: 's',
+      authorizeUrl: 'https://provider.test/authorize',
+      tokenUrl: 'https://provider.test/token',
+      scope: 'email',
+      profile: async () => ({ email: `oauth-stranger-${Date.now()}@example.com`, name: 'S' }),
+    };
+    const cfg = config({
+      signups: { open: false, allowedEmails: [] },
+      providers: { github: provider },
+      fetch: async () => Response.json({ access_token: 't' }),
+    });
+    const start = await call('GET', '/auth/github?next=%2F', { config: cfg });
+    const state = new URL(start.headers.get('Location') ?? '').searchParams.get('state');
+    const callback = await call('GET', `/auth/github/callback?code=x&state=${state}`, {
+      cookie: cookieFrom(start.headers, '__Host-oauth'),
+      config: cfg,
+    });
+    expect(callback.headers.get('Location')).toBe('/?signin=invite-only');
+  });
+
+  it('answers 429 with Retry-After when a person or an address is over its limit', async () => {
+    const cookie = await signIn(`busy-${Date.now()}@example.com`, 'Busy');
+    const userLimited = config({ limit: async (bucket) => bucket !== 'user' });
+    const limited = await app.request(
+      `${ORIGIN}/api/groups`,
+      { headers: { Cookie: cookie, 'cf-connecting-ip': '203.0.113.9' } },
+      { db: db.app, config: userLimited },
+    );
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('60');
+    expect(((await limited.json()) as { error: { code: string } }).error.code).toBe('RATE_LIMITED');
+
+    // The per-address limit applies before anything else, even to the health check.
+    const seen: string[] = [];
+    const ipLimited = config({
+      limit: async (bucket, key) => {
+        seen.push(`${bucket}:${key}`);
+        return bucket !== 'ip';
+      },
+    });
+    const health = await app.request(
+      `${ORIGIN}/api/health`,
+      { headers: { 'cf-connecting-ip': '203.0.113.9' } },
+      { db: db.app, config: ipLimited },
+    );
+    expect(health.status).toBe(429);
+    expect(seen).toEqual(['ip:203.0.113.9']);
   });
 });

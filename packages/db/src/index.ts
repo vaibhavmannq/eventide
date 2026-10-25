@@ -8,12 +8,14 @@ export {
   getGroup,
   INVITE_DAYS,
   type InvitePreview,
+  inviteIsValid,
   leaveGroup,
   listGroups,
   nightly,
   previewInvite,
   removeMember,
   SESSION_DAYS,
+  userExists,
   userForSession,
 } from './accounts.ts';
 export { asUser, type Pool, type PoolClient, type Queryable } from './connection.ts';
