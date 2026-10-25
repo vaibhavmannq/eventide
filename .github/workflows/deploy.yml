@@ -58,4 +58,10 @@ jobs:
       - name: Health check
         # EVENTIDE_URL is a repository variable (not a secret), e.g. https://eventide.<you>.workers.dev
         if: ${{ !inputs.only_migrate && vars.EVENTIDE_URL != '' }}
-        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 "${{ vars.EVENTIDE_URL }}/api/health"
+        env:
+          EVENTIDE_URL: ${{ vars.EVENTIDE_URL }}
+        # A trailing slash on the variable would make //api/health; strip it. Print the answer, which includes how
+        # long the database took to respond.
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "${EVENTIDE_URL%/}/api/health"
+          echo
