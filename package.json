@@ -1,0 +1,25 @@
+{
+  "name": "eventide",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit -p packages/ledger && tsc --noEmit -p scripts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.13",
+    "@types/node": "24.13.4",
+    "fast-check": "4.10.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
