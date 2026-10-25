@@ -15,7 +15,24 @@ import { money, today } from '../lib/money.ts';
 import { go } from '../lib/router.ts';
 import { edit, groups, myMemberId, record, remove, shownTransactions } from '../lib/store.ts';
 
-type Mode = 'equal' | 'exact' | 'shares';
+type Mode = 'equal' | 'exact' | 'percent' | 'shares';
+
+/** "Paid by" can be one person, or this: an amount for each of several people. */
+const SEVERAL = 'several';
+
+/**
+ * "33.33" → 3333 basis points. Up to two decimals, parsed from the text so a percentage never passes through a
+ * float, exactly like amounts (ADR 0002). Empty is zero; anything else that is not a percentage is null.
+ */
+function parsePercent(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === '') return 0;
+  const match = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(trimmed);
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+}
+
+const percentText = (basisPoints: number) => `${(basisPoints / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
 
 /** Adding or editing an expense; editing a payment shows it read-only with a delete button. */
 export function ExpenseForm({ groupId, transactionId }: { groupId: string; transactionId?: string }) {
@@ -61,10 +78,13 @@ function Form({
   const [amount, setAmount] = useState(start ? formatAmount(start.total, start.currency) : '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [occurredOn, setOccurredOn] = useState(existing?.occurredOn ?? today());
-  const [paidBy, setPaidBy] = useState(start?.paidBy.length === 1 ? (start.paidBy[0]?.member ?? mine) : mine);
-  const [mode, setMode] = useState<Mode>(
-    startSplit?.kind === 'exact' ? 'exact' : startSplit?.kind === 'shares' ? 'shares' : 'equal',
+  const [paidBy, setPaidBy] = useState(start && start.paidBy.length > 1 ? SEVERAL : (start?.paidBy[0]?.member ?? mine));
+  const [payers, setPayers] = useState<Record<string, string>>(
+    start && start.paidBy.length > 1
+      ? Object.fromEntries(start.paidBy.map((p) => [p.member, formatAmount(p.amount, start.currency)]))
+      : {},
   );
+  const [mode, setMode] = useState<Mode>(startSplit?.kind ?? 'equal');
   const [included, setIncluded] = useState<Set<string>>(
     new Set(startSplit?.kind === 'equal' ? startSplit.members : members.map((m) => m.id)),
   );
@@ -77,6 +97,11 @@ function Form({
     startSplit?.kind === 'shares'
       ? Object.fromEntries(startSplit.parts.map((p) => [p.member, String(p.weight)]))
       : Object.fromEntries(members.map((m) => [m.id, '1'])),
+  );
+  const [percents, setPercents] = useState<Record<string, string>>(
+    startSplit?.kind === 'percent'
+      ? Object.fromEntries(startSplit.parts.map((p) => [p.member, percentText(p.basisPoints).slice(0, -1)]))
+      : {},
   );
   const [error, setError] = useState('');
 
@@ -101,6 +126,17 @@ function Form({
             .map((m) => ({ member: m.id, amount: parseAmount(exact[m.id] || '0', currency) }))
             .filter((a) => a.amount !== 0),
         };
+      } else if (mode === 'percent') {
+        const parts: { member: string; basisPoints: number }[] = [];
+        for (const m of members) {
+          const basisPoints = parsePercent(percents[m.id] ?? '');
+          if (basisPoints === null) return { problem: `${m.displayName}’s percentage is not a number like 33.33` };
+          if (basisPoints > 0) parts.push({ member: m.id, basisPoints });
+        }
+        const sum = parts.reduce((a, b) => a + b.basisPoints, 0);
+        if (sum < 10000) return { problem: `${percentText(10000 - sum)} still to assign` };
+        if (sum > 10000) return { problem: `${percentText(sum - 10000)} over 100%` };
+        split = { kind: 'percent', parts };
       } else {
         const parts = members
           .map((m) => ({ member: m.id, weight: Number(shares[m.id] || 0) }))
@@ -111,13 +147,23 @@ function Form({
     } catch {
       return { problem: 'One of the amounts is not a valid number' };
     }
-    const transaction: Expense = {
-      kind: 'expense',
-      currency,
-      total,
-      paidBy: [{ member: paidBy, amount: total }],
-      split,
-    };
+    let paid: Expense['paidBy'];
+    if (paidBy === SEVERAL) {
+      try {
+        paid = members
+          .map((m) => ({ member: m.id, amount: parseAmount(payers[m.id] || '0', currency) }))
+          .filter((p) => p.amount !== 0);
+      } catch {
+        return { problem: 'One of the payments is not a valid amount' };
+      }
+      if (paid.some((p) => p.amount < 0)) return { problem: 'Payments are more than zero' };
+      const left = total - paid.reduce((a, b) => a + b.amount, 0);
+      if (left > 0) return { problem: `${money(left, currency)} of the payment still to assign` };
+      if (left < 0) return { problem: `The payments are ${money(-left, currency)} more than the total` };
+    } else {
+      paid = [{ member: paidBy, amount: total }];
+    }
+    const transaction: Expense = { kind: 'expense', currency, total, paidBy: paid, split };
     try {
       toPostings(transaction);
     } catch (e) {
@@ -201,6 +247,7 @@ function Form({
                     {m.id === mine ? `${m.displayName} (you)` : m.displayName}
                   </option>
                 ))}
+                <option value={SEVERAL}>Several people…</option>
               </select>
             </label>
             <label class="field">
@@ -209,13 +256,34 @@ function Form({
             </label>
           </div>
 
+          {paidBy === SEVERAL && (
+            <fieldset class="field">
+              <legend class="mono">Who paid how much</legend>
+              <ul class="split-list">
+                {members.map((m) => (
+                  <li key={m.id} class="split-row">
+                    <span>{m.id === mine ? `${m.displayName} (you)` : m.displayName}</span>
+                    <input
+                      class="small-input"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      aria-label={`${m.displayName} paid`}
+                      value={payers[m.id] ?? ''}
+                      onInput={(e) => setPayers({ ...payers, [m.id]: e.currentTarget.value.replace(',', '.') })}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          )}
+
           <fieldset class="field">
             <legend class="mono">Split</legend>
             <div class="modes mono">
-              {(['equal', 'exact', 'shares'] as const).map((m) => (
+              {(['equal', 'exact', 'percent', 'shares'] as const).map((m) => (
                 <label key={m} class={mode === m ? 'on' : ''}>
                   <input type="radio" name="split-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
-                  {m === 'equal' ? 'Equally' : m === 'exact' ? 'Exact' : 'Shares'}
+                  {m === 'equal' ? 'Equally' : m === 'exact' ? 'Exact' : m === 'percent' ? 'Percent' : 'Shares'}
                 </label>
               ))}
             </div>
@@ -252,6 +320,16 @@ function Form({
                         onInput={(e) => setExact({ ...exact, [m.id]: e.currentTarget.value.replace(',', '.') })}
                       />
                     )}
+                    {mode === 'percent' && (
+                      <input
+                        class="small-input"
+                        inputMode="decimal"
+                        placeholder="0"
+                        aria-label={`${m.displayName}'s percentage`}
+                        value={percents[m.id] ?? ''}
+                        onInput={(e) => setPercents({ ...percents, [m.id]: e.currentTarget.value.replace(',', '.') })}
+                      />
+                    )}
                     {mode === 'shares' && (
                       <input
                         class="small-input"
@@ -271,7 +349,7 @@ function Form({
           <p id="form-problem" class={error ? 'notice notice-bad' : 'muted small'} role={error ? 'alert' : undefined}>
             {'problem' in built
               ? error || built.problem
-              : `${names.get(paidBy) ?? 'Someone'} paid ${money(built.transaction.total, currency)}, split ${preview.length} ${preview.length === 1 ? 'way' : 'ways'}.`}
+              : `${payerNames(built.transaction.paidBy.map((p) => names.get(p.member) ?? 'Someone'))} paid ${money(built.transaction.total, currency)}, split ${preview.length} ${preview.length === 1 ? 'way' : 'ways'}.`}
           </p>
 
           <div class="actions">
@@ -336,4 +414,10 @@ function splitMembers(split: SplitSpec): string[] {
   if (split.kind === 'equal') return [...split.members];
   if (split.kind === 'exact') return split.amounts.map((a) => a.member);
   return split.parts.map((p) => p.member);
+}
+
+/** "Alice", "Alice and Bob", "Alice, Bob and Sam". */
+function payerNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? 'Someone';
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
