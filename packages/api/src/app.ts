@@ -46,7 +46,20 @@ app.use(async (c, next) => {
   await next();
 });
 
-app.get('/health', (c) => c.json({ ok: true }));
+/**
+ * Health: the Worker is up and can reach Postgres through Hyperdrive. One trivial query, so the deploy's health
+ * check proves the whole path works, not only that the Worker started.
+ */
+app.get('/health', async (c) => {
+  const started = Date.now();
+  const client = await c.env.db.connect();
+  try {
+    await client.query('select 1');
+  } finally {
+    client.release();
+  }
+  return c.json({ ok: true, database: { ok: true, ms: Date.now() - started } });
+});
 app.route('/auth', auth);
 app.use(requireUser);
 app.route('/', routes);
