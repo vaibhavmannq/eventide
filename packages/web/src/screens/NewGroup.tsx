@@ -4,38 +4,10 @@ import { currencies } from '../lib/currency.ts';
 import { go } from '../lib/router.ts';
 import { createGroup, me } from '../lib/store.ts';
 
-/** A sensible first guess at the currency, from the browser's region. The list lets you pick any other. */
-function guessCurrency(): string {
-  const region = new Intl.Locale(navigator.language).maximize().region ?? '';
-  const byRegion: Record<string, string> = {
-    IN: 'INR',
-    GB: 'GBP',
-    US: 'USD',
-    CA: 'CAD',
-    AU: 'AUD',
-    NZ: 'NZD',
-    JP: 'JPY',
-    SG: 'SGD',
-    AE: 'AED',
-    CH: 'CHF',
-    SE: 'SEK',
-    ZA: 'ZAR',
-    BR: 'BRL',
-    MX: 'MXN',
-    KR: 'KRW',
-    CN: 'CNY',
-    HK: 'HKD',
-    TH: 'THB',
-    ID: 'IDR',
-    SA: 'SAR',
-  };
-  const euro = ['DE', 'FR', 'ES', 'IT', 'NL', 'IE', 'PT', 'BE', 'AT', 'FI', 'GR'];
-  return byRegion[region] ?? (euro.includes(region) ? 'EUR' : 'USD');
-}
-
 export function NewGroup() {
   const [name, setName] = useState('');
-  const [currency, setCurrency] = useState(guessCurrency);
+  // INR first; the list offers every other currency.
+  const [currency, setCurrency] = useState('INR');
   const [displayName, setDisplayName] = useState(me.value?.name.split(' ')[0] ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
