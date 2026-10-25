@@ -22,6 +22,8 @@ export interface Member {
   displayName: string;
   userId: string | null;
   role: 'owner' | 'member';
+  /** Set once they have left or been removed; they still appear in the history they are part of. */
+  leftAt?: string | null;
 }
 
 /** A transaction as it stands now, which is also what a write returns and what a retried write returns again. */

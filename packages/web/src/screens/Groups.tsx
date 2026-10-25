@@ -1,6 +1,7 @@
 import { Header } from '../components/Header.tsx';
 import { Moon } from '../components/Moon.tsx';
 import { money } from '../lib/money.ts';
+import { moonTonight } from '../lib/moonphase.ts';
 import { onLink } from '../lib/router.ts';
 import { settledness } from '../lib/settled.ts';
 import { groupIds, groups, me, myMemberId, shownTransactions, summarise } from '../lib/store.ts';
@@ -30,45 +31,70 @@ export function standing(groupId: string): { text: string; tone: 'owed' | 'owe' 
   return { text: `You’re owed ${list(owed)}, you owe ${list(owe)}`, tone: 'owe', lit };
 }
 
+/** The log line, in the portfolio's voice: today, now, and tonight's real moon. */
+function Log() {
+  const now = new Date();
+  const moon = moonTonight(now);
+  const date = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const time = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return (
+    <p class="mono log">
+      <span>
+        Log · {date} · {time}
+      </span>
+      <span class="tonight">
+        {moon.name} · {Math.round(moon.lit * 100)}% lit
+      </span>
+    </p>
+  );
+}
+
 export function Groups() {
   const first = me.value?.name.split(' ')[0] ?? '';
   const ids = groupIds.value.filter((id) => groups.value[id]);
+  const owing = ids.some((id) => standing(id).tone !== 'even');
   return (
     <>
       <Header />
       <main class="page">
-        <p class="mono label">Your groups</p>
-        <h1 class="title">
+        <Log />
+        <h1 class="greeting">
           {greeting()}
           {first && `, ${first}`}
+          <em>
+            {ids.length === 0 ? 'Nothing to settle yet.' : owing ? 'Here’s where everyone stands.' : 'Everyone’s even.'}
+          </em>
         </h1>
         {ids.length === 0 ? (
           <div class="empty">
             <Moon lit={0.08} size={56} />
-            <p>No groups yet. Start one for your flat, a trip, or a dinner, then invite people with a link.</p>
+            <p>Start a group for your flat, a trip, or a dinner, then invite people with a link.</p>
           </div>
         ) : (
-          <ul class="cards">
-            {ids.map((id) => {
-              const cache = groups.value[id];
-              if (!cache) return null;
-              const s = standing(id);
-              return (
-                <li key={id}>
-                  <a class="card group-card" href={`/groups/${id}`} onClick={(e) => onLink(e, `/groups/${id}`)}>
-                    <Moon lit={s.lit} size={44} />
-                    <span class="group-card-text">
-                      <span class="group-name">{cache.group.name}</span>
-                      <span class={`standing standing-${s.tone}`}>{s.text}</span>
-                    </span>
-                    <span class="mono chevron" aria-hidden="true">
-                      →
-                    </span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <h2 class="mono label">Your groups</h2>
+            <ul class="group-list">
+              {ids.map((id) => {
+                const cache = groups.value[id];
+                if (!cache) return null;
+                const s = standing(id);
+                return (
+                  <li key={id}>
+                    <a class="group-row" href={`/groups/${id}`} onClick={(e) => onLink(e, `/groups/${id}`)}>
+                      <Moon lit={s.lit} size={44} />
+                      <span class="group-row-text">
+                        <span class="group-name">{cache.group.name}</span>
+                        <span class={`standing standing-${s.tone}`}>{s.text}</span>
+                      </span>
+                      <span class="mono chevron" aria-hidden="true">
+                        →
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
         <div class="actions">
           <a class="pill pill-solid" href="/new" onClick={(e) => onLink(e, '/new')}>

@@ -1,6 +1,6 @@
-import { CURRENCY_EXPONENTS } from '@eventide/ledger';
 import { useState } from 'preact/hooks';
 import { Header } from '../components/Header.tsx';
+import { currencies } from '../lib/currency.ts';
 import { go } from '../lib/router.ts';
 import { createGroup, me } from '../lib/store.ts';
 
@@ -77,9 +77,9 @@ export function NewGroup() {
           <label class="field">
             <span class="mono">Currency</span>
             <select value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
-              {Object.keys(CURRENCY_EXPONENTS).map((code) => (
-                <option key={code} value={code}>
-                  {code}
+              {currencies.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
                 </option>
               ))}
             </select>

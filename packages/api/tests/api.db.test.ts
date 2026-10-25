@@ -300,6 +300,32 @@ describe('a flat sharing costs', () => {
     expect(stranger).toMatchObject({ status: 422, json: { error: { code: 'UNKNOWN_MEMBER' } } });
   });
 
+  it('refuses leaving while money is owed, with 409 and a reason', async () => {
+    const sam = await call('POST', `/groups/${groupId}/members`, { cookie: alice, body: { displayName: 'Pat' } });
+    expect((await call('DELETE', `/groups/${groupId}/members/${sam.json.member.id}`, { cookie: bob })).status).toBe(
+      204,
+    );
+    const owing = await call('POST', `/groups/${groupId}/transactions`, {
+      cookie: alice,
+      key: randomUUID(),
+      body: {
+        id: randomUUID(),
+        occurredOn: '2026-10-28',
+        transaction: {
+          kind: 'expense',
+          currency: 'GBP',
+          total: 1000,
+          paidBy: [{ member: member.alice, amount: 1000 }],
+          split: { kind: 'equal', members: [member.alice, member.bob] },
+        },
+      },
+    });
+    expect(owing.status).toBe(201);
+    const leave = await call('POST', `/groups/${groupId}/leave`, { cookie: bob });
+    expect(leave).toMatchObject({ status: 409, json: { error: { code: 'NOT_SETTLED' } } });
+    expect((await call('DELETE', `/groups/${groupId}`, { cookie: bob })).status).toBe(403);
+  });
+
   it('shows outsiders nothing, not even whether the group exists', async () => {
     const mallory = await signIn('mallory@example.com', 'Mallory');
     for (const path of [`/groups/${groupId}`, `/groups/${groupId}/balances`, `/groups/${groupId}/changes`]) {

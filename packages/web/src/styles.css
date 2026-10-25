@@ -39,24 +39,28 @@
   font-display: swap;
 }
 
+/* The portfolio's rules (vaibhavmannq.github.io, design spec §3.3–3.4), applied to an everyday tool:
+   - no panels behind text: no cards, no boxes, no glass. Space and hairlines do the grouping;
+   - type carries the screen: Satoshi set tight for everything, Fraunces only for the name and the greeting,
+     Space Mono for the log voice (dates, chapter titles, small labels);
+   - one focal point per screen, and the only light is the moon. */
+
 :root {
   color-scheme: dark;
   --night: #020406;
-  --deep: #071014;
-  --sea: #0e1c21;
+  --deep: #061014;
   --ink: #e6eef0;
   --ink-dim: rgba(230, 238, 240, 0.78);
-  --ink-faint: rgba(230, 238, 240, 0.55);
-  --line: rgba(230, 238, 240, 0.12);
+  --ink-faint: rgba(230, 238, 240, 0.58);
+  --line: rgba(230, 238, 240, 0.14);
   --glow: #9fe6ee;
   --warm: #f1cf9a;
   --bad: #f4a99c;
-  --card: rgba(16, 30, 35, 0.62);
+  --field: #071116;
   --font-body: Satoshi, "Segoe UI", system-ui, sans-serif;
   --font-name: Fraunces, Georgia, "Times New Roman", serif;
   --font-mono: "Space Mono", "Cascadia Mono", ui-monospace, monospace;
-  --gutter: clamp(16px, 4vw, 40px);
-  --radius: 16px;
+  --gutter: clamp(16px, 5vw, 48px);
 }
 
 * {
@@ -70,10 +74,11 @@ html {
 body {
   margin: 0;
   min-height: 100dvh;
-  background: radial-gradient(120% 70% at 75% -10%, #1c3a42 0%, var(--deep) 45%, var(--night) 100%) fixed;
+  background: radial-gradient(130% 60% at 80% -10%, #173138 0%, var(--deep) 42%, var(--night) 100%) fixed;
   background-color: var(--night);
   color: var(--ink);
   font: 400 1rem / 1.55 var(--font-body);
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -86,6 +91,7 @@ input,
 select {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
 }
 
 :focus-visible {
@@ -104,41 +110,76 @@ select {
 
 .label {
   color: var(--glow);
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.75rem;
 }
 
+.log {
+  color: var(--ink-faint);
+  margin: 0 0 2.5rem;
+  line-height: 1.9;
+}
+
+.log span {
+  display: block;
+}
+
+.log .tonight {
+  color: var(--glow);
+}
+
+/* Fraunces: the name and the greeting only, with its italic second line. */
 .name {
   font-family: var(--font-name);
   font-weight: 300;
-  font-size: clamp(3.4rem, 15vw, 6.5rem);
+  font-size: clamp(3.6rem, 16vw, 7rem);
   line-height: 0.95;
   letter-spacing: -0.02em;
   margin: 0;
 }
 
-.title {
+.greeting {
   font-family: var(--font-name);
   font-weight: 300;
-  font-size: clamp(2rem, 8vw, 3rem);
+  font-size: clamp(2.2rem, 9vw, 3.6rem);
   line-height: 1.05;
-  letter-spacing: -0.01em;
-  margin: 0 0 1.5rem;
-  overflow-wrap: anywhere;
+  letter-spacing: -0.015em;
+  margin: 0 0 3rem;
 }
 
-.subtitle {
-  font-family: var(--font-name);
-  font-weight: 400;
-  font-size: 1.3rem;
-  margin: 0;
+.greeting em,
+.tagline {
+  display: block;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--ink-dim);
+}
+
+.greeting em {
+  font-size: 0.55em;
+  margin-top: 0.5rem;
 }
 
 .tagline {
   font-family: var(--font-name);
-  font-style: italic;
-  font-weight: 300;
   font-size: clamp(1.4rem, 5vw, 1.9rem);
   margin: 0.6rem 0 0;
+}
+
+/* Satoshi, tight: every other heading. */
+.title {
+  font-weight: 400;
+  font-size: clamp(2.2rem, 9vw, 3.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  margin: 0 0 2rem;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  font-weight: 400;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  margin: 0;
 }
 
 .lede {
@@ -171,15 +212,14 @@ select {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: max(14px, env(safe-area-inset-top)) var(--gutter) 14px;
-  background: linear-gradient(to bottom, rgba(2, 4, 6, 0.92), rgba(2, 4, 6, 0.6) 70%, transparent);
-  backdrop-filter: blur(8px);
+  padding: max(16px, env(safe-area-inset-top)) var(--gutter) 16px;
+  background: linear-gradient(to bottom, var(--night) 0%, rgba(2, 4, 6, 0.85) 60%, transparent);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
+  gap: 1.25rem;
 }
 
 .brand,
@@ -187,7 +227,7 @@ select {
   text-decoration: none;
   background: none;
   border: 0;
-  padding: 6px 0;
+  padding: 8px 0;
   cursor: pointer;
   color: var(--ink);
 }
@@ -195,6 +235,10 @@ select {
 .link:hover,
 .brand:hover {
   color: var(--glow);
+}
+
+.link-bad {
+  color: var(--bad);
 }
 
 .status {
@@ -209,18 +253,19 @@ select {
   width: 100%;
   max-width: 1080px;
   margin: 0 auto;
-  padding: 1.5rem var(--gutter) 9rem; /* room to scroll the last row clear of the Add expense button */
+  padding: 1.75rem var(--gutter) 9rem; /* room to scroll the last row clear of the Add expense button */
 }
 
 .narrow {
-  max-width: 560px;
+  max-width: 600px;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.75rem;
 }
 
 .stack {
@@ -228,7 +273,35 @@ select {
   gap: 0.75rem;
 }
 
-/* ─── Pills and cards ──────────────────────────────────────────────────────── */
+.section {
+  margin-top: 3rem;
+}
+
+/* Things arrive the way the portfolio's lines do: a short rise, never on a clock you can see. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.page > * {
+  animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.page > :nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.page > :nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.page > :nth-child(n + 4) {
+  animation-delay: 0.12s;
+}
+
+/* ─── Pills, the only shapes with an outline (as in the portfolio) ────────── */
 
 .pill {
   display: inline-flex;
@@ -238,10 +311,10 @@ select {
   padding: 0 1.4rem;
   border-radius: 999px;
   border: 1px solid rgba(230, 238, 240, 0.35);
-  background: rgba(2, 4, 6, 0.35);
+  background: transparent;
   color: var(--ink);
   text-decoration: none;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   cursor: pointer;
   transition:
     background-color 0.2s,
@@ -251,6 +324,7 @@ select {
 
 .pill:hover {
   border-color: var(--glow);
+  color: var(--glow);
 }
 
 .pill-solid {
@@ -262,6 +336,7 @@ select {
 
 .pill-solid:hover {
   background: #fff;
+  color: var(--night);
 }
 
 .pill-small {
@@ -276,36 +351,19 @@ select {
 }
 
 .pill:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
-  backdrop-filter: blur(14px);
-}
-
-.cards {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
 .notice {
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
   margin: 0.75rem 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--line);
 }
 
 .notice-bad {
   color: var(--bad);
-  background: rgba(244, 169, 156, 0.08);
-  border: 1px solid rgba(244, 169, 156, 0.25);
+  border-left-color: var(--bad);
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -330,8 +388,8 @@ select {
 }
 
 .moon-dark {
-  fill: rgba(230, 238, 240, 0.08);
-  stroke: rgba(230, 238, 240, 0.35);
+  fill: rgba(230, 238, 240, 0.06);
+  stroke: rgba(230, 238, 240, 0.3);
   stroke-width: 1;
 }
 
@@ -368,42 +426,60 @@ select {
 .signin-body {
   position: relative;
   width: 100%;
-  max-width: 560px;
+  max-width: 600px;
   margin: 0 auto 4vh;
 }
 
 .dev-signin {
-  margin-top: 2rem;
+  margin-top: 2.5rem;
   padding-top: 1.25rem;
   border-top: 1px dashed var(--line);
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-/* ─── Groups ───────────────────────────────────────────────────────────────── */
+/* ─── Lists: hairlines, never boxes ────────────────────────────────────────── */
 
-.group-card {
+.rows,
+.days,
+.people,
+.split-list,
+.failed-list,
+.settle-list,
+.group-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.group-list {
+  border-top: 1px solid var(--line);
+}
+
+.group-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.1rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--line);
   text-decoration: none;
-  transition: border-color 0.2s;
 }
 
-.group-card:hover {
-  border-color: rgba(159, 230, 238, 0.4);
-}
-
-.group-card-text {
+.group-row-text {
   display: grid;
   flex: 1;
   min-width: 0;
 }
 
 .group-name {
-  font-family: var(--font-name);
-  font-size: 1.35rem;
+  font-size: 1.45rem;
+  letter-spacing: -0.025em;
   overflow-wrap: anywhere;
+  transition: color 0.2s;
+}
+
+.group-row:hover .group-name {
+  color: var(--glow);
 }
 
 .chevron {
@@ -424,10 +500,11 @@ select {
 
 .empty {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: center;
   color: var(--ink-dim);
-  max-width: 40ch;
+  max-width: 42ch;
+  margin-bottom: 1rem;
 }
 
 /* ─── A group ──────────────────────────────────────────────────────────────── */
@@ -442,64 +519,47 @@ select {
 
 .group-columns {
   display: grid;
-  gap: 2rem;
+  gap: 1rem;
 }
 
-.summary-card {
+/* The one focal point: the moon and where you stand, set large, nothing around them. */
+.standing-block {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
+  gap: 1.25rem;
+  margin: 0.5rem 0 0;
 }
 
 .standing-big {
-  font-family: var(--font-name);
-  font-size: clamp(1.5rem, 6vw, 2rem);
   font-weight: 300;
-  line-height: 1.15;
-  margin: 0;
-}
-
-.settle {
-  margin-top: 1.5rem;
-}
-
-.settle-list,
-.rows,
-.days,
-.people,
-.split-list,
-.failed-list {
-  list-style: none;
-  padding: 0;
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   margin: 0;
 }
 
 .settle-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas: "who amount" "button button";
-  gap: 0.5rem 1rem;
+  gap: 0.25rem 1rem;
   align-items: center;
-  padding: 0.85rem 0;
+  padding: 1rem 0;
   border-bottom: 1px solid var(--line);
 }
 
-.settle-row > span:first-child {
-  grid-area: who;
-}
-
-.settle-row > .amount {
-  grid-area: amount;
-}
-
-.settle-row > button {
-  grid-area: button;
+.settle-row .link {
   justify-self: start;
+  color: var(--glow);
+  padding: 4px 0;
+}
+
+.settle-row .link:hover {
+  color: var(--ink);
 }
 
 .day {
   color: var(--ink-faint);
-  margin: 1.4rem 0 0.4rem;
+  margin: 1.75rem 0 0.25rem;
   font-size: 0.68rem;
 }
 
@@ -508,7 +568,7 @@ select {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.8rem 0;
+  padding: 0.9rem 0;
   border-bottom: 1px solid var(--line);
   text-decoration: none;
 }
@@ -519,8 +579,9 @@ select {
 }
 
 .row-title {
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   overflow-wrap: anywhere;
+  transition: color 0.2s;
 }
 
 .row:hover .row-title {
@@ -563,52 +624,61 @@ select {
   bottom: 0;
   display: flex;
   justify-content: center;
-  padding: 1rem var(--gutter) max(1rem, env(safe-area-inset-bottom));
-  background: linear-gradient(to top, rgba(2, 4, 6, 0.95), rgba(2, 4, 6, 0.7) 60%, transparent);
+  padding: 1.25rem var(--gutter) max(1.25rem, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--night) 30%, rgba(2, 4, 6, 0.75) 70%, transparent);
   pointer-events: none;
 }
 
 .fab .pill {
   pointer-events: auto;
-  box-shadow: 0 10px 40px rgba(159, 230, 238, 0.15);
 }
 
 .person {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 1rem;
-  padding: 0.85rem 0;
+  padding: 1rem 0;
   border-bottom: 1px solid var(--line);
 }
 
+.person-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
 .people {
-  margin-bottom: 2rem;
+  border-top: 1px solid var(--line);
 }
 
 .link-box {
   width: 100%;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(2, 4, 6, 0.5);
+  padding: 0.75rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
   font-family: var(--font-mono);
   font-size: 0.8rem;
+  letter-spacing: 0;
 }
 
-form.card {
-  margin-top: 1rem;
+.danger-zone {
+  margin-top: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(244, 169, 156, 0.25);
 }
 
-/* ─── Forms ────────────────────────────────────────────────────────────────── */
+/* ─── Forms: a line to write on, not a box ─────────────────────────────────── */
 
 .form {
   display: grid;
-  gap: 1.1rem;
+  gap: 1.5rem;
 }
 
 .field {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.25rem;
   border: 0;
   padding: 0;
   margin: 0;
@@ -619,135 +689,165 @@ form.card {
 .field > legend {
   color: var(--ink-faint);
   padding: 0;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
 }
 
 .field input,
 .field select {
   width: 100%;
   min-height: 48px;
-  padding: 0 0.9rem;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(2, 4, 6, 0.55);
-  font-size: 1rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(230, 238, 240, 0.28);
+  border-radius: 0;
+  background: transparent;
+  font-size: 1.1rem;
+  transition: border-color 0.2s;
+}
+
+/* A native list should look like the page, not like the operating system's grey sheet. */
+.field select {
+  appearance: none;
+  background:
+    transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23e6eef0' stroke-opacity='.7' stroke-width='1.4'/%3E%3C/svg%3E")
+    right 2px center / 12px 8px no-repeat;
+  padding-right: 1.5rem;
+  cursor: pointer;
+}
+
+.field select option {
+  background: var(--field);
+  color: var(--ink);
 }
 
 .field input:focus,
 .field select:focus {
-  border-color: var(--glow);
+  border-bottom-color: var(--glow);
   outline: none;
+}
+
+.field input::placeholder {
+  color: rgba(230, 238, 240, 0.3);
 }
 
 .amount-row {
   display: grid;
-  grid-template-columns: 1fr 7rem;
-  gap: 0.75rem;
+  grid-template-columns: 1fr minmax(7.5rem, 38%);
+  gap: 1.25rem;
+  align-items: end;
+}
+
+/* On a phone the currency gets its own line, so its name is never cut off. */
+@media (max-width: 599px) {
+  .amount-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field .amount-input {
-  min-height: 72px;
-  font-family: var(--font-name);
+  min-height: 76px;
   font-weight: 300;
-  font-size: 2.6rem;
+  font-size: 3rem;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .two {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  gap: 1.25rem;
 }
 
-.segmented {
+/* How to split: three words in the log's voice, the chosen one lit and underlined. */
+.modes {
   display: flex;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 3px;
-  gap: 3px;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.segmented label {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  border-radius: 999px;
+.modes label {
+  position: relative;
   cursor: pointer;
-  color: var(--ink-dim);
-  font-size: 0.9rem;
-  text-align: center;
+  color: var(--ink-faint);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid transparent;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
 }
 
-/* The real radio stays in the page for keyboards and screen readers; the label is what you see. */
-.segmented input {
+.modes label.on {
+  color: var(--glow);
+  border-bottom-color: var(--glow);
+}
+
+/* The real radio stays in the page for keyboards and screen readers; the word is what you see. */
+.modes input {
   position: absolute;
   opacity: 0;
   width: 1px;
   height: 1px;
 }
 
-.segmented label:has(input:focus-visible) {
+.modes label:has(input:focus-visible) {
   outline: 2px solid var(--glow);
-  outline-offset: 2px;
-}
-
-.segmented label.on {
-  background: var(--ink);
-  color: var(--night);
-  font-weight: 500;
+  outline-offset: 4px;
 }
 
 .split-list {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 
+/* Fixed columns, so a share appearing or disappearing never moves the boxes next to it. */
 .split-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) 5.5rem 6.5rem;
   align-items: center;
-  gap: 0.75rem;
-  min-height: 52px;
+  gap: 1rem;
+  min-height: 56px;
   border-bottom: 1px solid var(--line);
+}
+
+.split-row .share-preview {
+  grid-column: 3;
+  text-align: right;
 }
 
 .check {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
   cursor: pointer;
+  min-width: 0;
 }
 
 .check input {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   min-height: 0;
   accent-color: var(--glow);
 }
 
 .field .small-input {
-  width: 6.5rem;
+  width: 100%;
   min-height: 40px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Laptop ───────────────────────────────────────────────────────────────── */
 
 @media (min-width: 900px) {
   .group-columns {
-    grid-template-columns: minmax(300px, 380px) 1fr;
-    gap: 3rem;
+    grid-template-columns: minmax(300px, 400px) 1fr;
+    gap: 4rem;
     align-items: start;
   }
 
   .summary {
     position: sticky;
-    top: 5rem;
-  }
-
-  .cards {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    top: 5.5rem;
   }
 
   .fab {
@@ -758,7 +858,15 @@ form.card {
 
 @media (prefers-reduced-motion: reduce) {
   * {
-    /* biome-ignore lint/complexity/noImportantStyles: a user preference must beat every component's own transition */
+    /* biome-ignore lint/complexity/noImportantStyles: a user preference must beat every component's own motion */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: as above */
     transition: none !important;
+  }
+}
+
+@media (min-width: 900px) {
+  .group-columns > .activity {
+    margin-top: 0;
   }
 }
