@@ -112,7 +112,7 @@ jobs:
           psql -h localhost -U postgres -c 'create database eventide_dev'
           DATABASE_URL=postgres://postgres@localhost:5432/eventide_dev npm run db:migrate
           psql -h localhost -U postgres -d eventide_dev -c "create role eventide_api_dev login password 'eventide_api_dev'; grant eventide_app to eventide_api_dev;"
-          printf 'DEV_LOGIN=true\nSIGNUPS=open\n' > packages/api/.dev.vars
+          printf 'DEV_LOGIN=true\nSIGNUPS=open\nRATE_LIMITS=off\n' > packages/api/.dev.vars
 
       - name: Build the app
         run: npm run build -w @eventide/web
@@ -125,7 +125,7 @@ jobs:
 
       - name: Keep screenshots and traces
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright
           path: test-results/

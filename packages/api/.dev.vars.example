@@ -2,6 +2,8 @@
 DEV_LOGIN=true
 # Production is invite-only by default; locally, let anyone in.
 SIGNUPS=open
+# Locally every browser looks like the same address; the limits are for production.
+RATE_LIMITS=off
 # GITHUB_CLIENT_ID=
 # GITHUB_CLIENT_SECRET=
 # GOOGLE_CLIENT_ID=

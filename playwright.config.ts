@@ -11,7 +11,8 @@ export default defineConfig({
   timeout: 60_000,
   fullyParallel: false,
   workers: 1,
-  reporter: [['list']],
+  // On CI, failures also become annotations on the pull request, readable without opening the log.
+  reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   use: {
     // 127.0.0.1 rather than localhost: the app skips the service worker on "localhost" during development,
     // and these tests want the real thing.

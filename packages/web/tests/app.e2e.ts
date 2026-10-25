@@ -279,3 +279,26 @@ test('several people can pay one bill', async ({ browser }) => {
   await expect(alice.getByLabel('Paid by')).toHaveValue('several');
   await expect(field(alice, 'Bob paid')).toHaveValue('300.00');
 });
+
+test('a change whose request is dropped is retried within seconds, not at the next 30-second tick', async ({
+  browser,
+}) => {
+  const alice = await newExpenseInThree(browser, 'Flaky network');
+  await alice.getByLabel('Amount', { exact: true }).fill('300');
+  await alice.getByLabel('What for').fill('Snacks');
+  await alice.getByRole('button', { name: 'Add expense' }).click();
+  await expect(alice.getByText('All saved')).toBeVisible();
+
+  // The edit's first request dies mid-flight, as a request does when a phone switches networks.
+  let dropped = 0;
+  await alice.route('**/api/groups/*/transactions/*', async (route) => {
+    if (route.request().method() === 'PUT' && dropped++ === 0) return route.abort('connectionreset');
+    return route.continue();
+  });
+  await alice.getByRole('link', { name: /Snacks/ }).click();
+  await alice.getByLabel('Amount', { exact: true }).fill('600');
+  await alice.getByRole('button', { name: 'Save changes' }).click();
+  await expect(alice.getByText('You’re owed ₹400.00')).toBeVisible();
+  await expect(alice.getByText('All saved')).toBeVisible(); // well inside the default 5 s
+  expect(dropped).toBe(2); // the dropped attempt, then the retry that got through
+});

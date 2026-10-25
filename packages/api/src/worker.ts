@@ -20,6 +20,11 @@ interface Env {
   SIGNUPS?: string;
   /** Comma-separated emails that may create an account without an invite (yours, at least). */
   ALLOWED_EMAILS?: string;
+  /**
+   * "off" only for local development and CI: `wrangler dev` sees every test browser as the same address, so a fast
+   * test run would spend the per-IP budget meant for one person. Production never sets it.
+   */
+  RATE_LIMITS?: string;
   /** Cloudflare's rate limiting bindings (wrangler.jsonc, `ratelimits`). */
   RL_IP?: RateLimit;
   RL_USER?: RateLimit;
@@ -50,10 +55,13 @@ function configFrom(env: Env): Config {
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean),
     },
-    limit: async (bucket, key) => {
-      const binding = bucket === 'ip' ? env.RL_IP : env.RL_USER;
-      return binding ? (await binding.limit({ key })).success : true;
-    },
+    limit:
+      env.RATE_LIMITS === 'off'
+        ? undefined
+        : async (bucket, key) => {
+            const binding = bucket === 'ip' ? env.RL_IP : env.RL_USER;
+            return binding ? (await binding.limit({ key })).success : true;
+          },
     devLogin: env.DEV_LOGIN === 'true',
     fetch: (input, init) => fetch(input, init),
     log: (entry) => console.log(JSON.stringify(entry)),

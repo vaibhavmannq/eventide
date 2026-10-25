@@ -145,6 +145,21 @@ export async function signOut(): Promise<void> {
 
 let running: Promise<void> | undefined;
 let again = false;
+let retryDelay = 1000;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * After a failed send (the connection dropped, the server was busy), try again soon rather than at the next
+ * 30-second tick: 1 s, then 2, 4, 8… up to 30 s, back to 1 s once a sync gets through.
+ */
+function retrySoon() {
+  if (retryTimer || pendingCount.value === 0) return;
+  retryTimer = setTimeout(() => {
+    retryTimer = undefined;
+    void sync();
+  }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 30_000);
+}
 
 /**
  * Sends the outbox, then pulls what changed. One run at a time. A call during a run (say, a change saved while
@@ -163,9 +178,11 @@ export function sync(): Promise<void> {
         again = false;
         try {
           await flush();
+          retryDelay = 1000;
           await refreshGroups();
         } catch (error) {
           if (!isNetworkError(error)) console.error(error);
+          retrySoon();
           break;
         }
       } while (again);
