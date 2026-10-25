@@ -1,15 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Eventide</title>
-  <defs>
-    <radialGradient id="sky" cx="70%" cy="20%" r="90%">
-      <stop offset="0" stop-color="#1f3d45"/>
-      <stop offset="0.55" stop-color="#071014"/>
-      <stop offset="1" stop-color="#020406"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#sky)"/>
-  <circle cx="256" cy="226" r="110" fill="#e6eef0" fill-opacity="0.08" stroke="#e6eef0" stroke-opacity="0.3" stroke-width="3"/>
-  <path d="M256 116 A110 110 0 0 1 256 336 A44 110 0 0 0 256 116 Z" fill="#f2f6f4"/>
-  <rect x="96" y="392" width="320" height="6" rx="3" fill="#9fe6ee" fill-opacity="0.55"/>
-  <rect x="156" y="414" width="200" height="5" rx="2.5" fill="#9fe6ee" fill-opacity="0.3"/>
+  <!-- The portfolio's glyph (vaibhavmannq.github.io/favicon.svg): the moon, the dot of its light, the water. -->
+  <rect width="64" height="64" rx="14" fill="#020406"/>
+  <g fill="none" stroke="#e6eef0" stroke-linecap="round">
+    <circle cx="32" cy="32" r="21" stroke-width="3"/>
+    <path d="M13 37 q4.75 -4 9.5 0 t9.5 0 t9.5 0 t9.5 0" stroke-width="3"/>
+  </g>
+  <circle cx="32" cy="23" r="5" fill="#9fe6ee"/>
 </svg>

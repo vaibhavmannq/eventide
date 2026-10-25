@@ -5,7 +5,8 @@
  *  - /assets/*: file names change with their content, so a cached copy is always right.
  *  - Fonts, icons, images: cached on first use.
  */
-const CACHE = 'eventide-v1';
+// Bump when cached files change under the same name (icons, fonts): the old cache is dropped on activate.
+const CACHE = 'eventide-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/', '/manifest.webmanifest'])));
