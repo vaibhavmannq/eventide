@@ -47,6 +47,10 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_OWNER_URL }}
         run: npm run db:migrate
 
+      - name: Build the app
+        if: ${{ !inputs.only_migrate }}
+        run: npm run build -w @eventide/web
+
       - name: Deploy the Worker
         if: ${{ !inputs.only_migrate }}
         working-directory: packages/api

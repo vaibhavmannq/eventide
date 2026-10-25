@@ -46,6 +46,11 @@ const base64url = (bytes: Uint8Array) =>
     .replaceAll('/', '_')
     .replace(/=+$/, '');
 
+function providerName(name: string): ProviderName {
+  if (name !== 'github' && name !== 'google') throw new HttpError(404, 'NOT_FOUND', 'Not found');
+  return name;
+}
+
 interface OAuthState {
   state: string;
   verifier: string;
@@ -54,13 +59,22 @@ interface OAuthState {
 }
 
 export const auth = new Hono<AppEnv>()
+  /** Which sign-in buttons the app should show. */
+  .get('/providers', (c) =>
+    c.json({
+      github: Boolean(c.env.config.providers.github),
+      google: Boolean(c.env.config.providers.google),
+      dev: c.env.config.devLogin,
+    }),
+  )
+
   /**
    * Starts "Sign in with GitHub/Google": OAuth 2 authorisation code flow with PKCE. The state and the PKCE
    * verifier go in a short-lived cookie, so the callback can check the response belongs to this browser's own
    * sign-in (stopping login CSRF) and only this browser can exchange the code.
    */
-  .get('/:provider{github|google}', async (c) => {
-    const name = c.req.param('provider') as ProviderName;
+  .get('/:provider', async (c) => {
+    const name = providerName(c.req.param('provider'));
     const provider = c.env.config.providers[name];
     if (!provider) throw new HttpError(404, 'NOT_FOUND', `Sign-in with ${name} is not set up`);
 
@@ -85,8 +99,8 @@ export const auth = new Hono<AppEnv>()
     return c.redirect(url.toString(), 302);
   })
 
-  .get('/:provider{github|google}/callback', async (c) => {
-    const name = c.req.param('provider') as ProviderName;
+  .get('/:provider/callback', async (c) => {
+    const name = providerName(c.req.param('provider'));
     const provider = c.env.config.providers[name];
     const raw = getCookie(c, OAUTH, 'host');
     deleteCookie(c, OAUTH, secure);

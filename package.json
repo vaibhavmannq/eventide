@@ -12,13 +12,16 @@
   "scripts": {
     "check": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "tsc --noEmit -p packages/ledger && tsc --noEmit -p packages/db && tsc --noEmit -p packages/api && tsc --noEmit -p scripts",
+    "typecheck": "tsc --noEmit -p packages/ledger && tsc --noEmit -p packages/db && tsc --noEmit -p packages/api && tsc --noEmit -p packages/web && tsc --noEmit -p scripts",
     "test": "vitest run",
     "test:db": "vitest run -c vitest.db.config.ts",
-    "db:migrate": "node --experimental-strip-types --no-warnings packages/db/src/cli.ts"
+    "db:migrate": "node --experimental-strip-types --no-warnings packages/db/src/cli.ts",
+    "e2e": "playwright test",
+    "dev": "npm run build -w @eventide/web && npm run dev -w @eventide/api"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
+    "@playwright/test": "^1.63.0",
     "@types/node": "24.13.4",
     "@types/pg": "^8.23.1",
     "fast-check": "4.10.2",

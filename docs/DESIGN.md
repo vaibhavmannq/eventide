@@ -339,13 +339,14 @@ Limits to know about:
 | 0 | Design, ledger core | Done |
 | 1 | Database schema, migrations, write paths, integration tests | Done |
 | 2 | API: auth, groups, members, invites, expenses, payments, settle-up, change feed | Built and tested; deploying is the last step (docs/DEPLOY.md) |
-| 3 | Web app: installable, offline outbox | Usable on a phone |
+| 3 | Web app: installable, offline outbox | Built and tested end to end; on your phone for feedback |
 | 4 | Concurrency, crash and load tests | Numbers published in the README |
 | 5 | Case study card on the portfolio | Live |
 
 ## 15. Open questions
 
-- Frontend framework: plain TypeScript like the portfolio, or a small framework (Svelte, Preact) for the forms.
+- ~~Frontend framework~~: Preact with signals, about 20 KB gzipped in all. Forms and lists are most of the app,
+  and a component model pays for itself there; React's runtime would be five times the size for no gain.
 - Rate limiting: not built yet. Whether Cloudflare's rate limiting is usable on the free plan, or a per-user
   counter in Postgres is needed.
 - Leaving a group and removing a member (allowed only at a zero balance).
