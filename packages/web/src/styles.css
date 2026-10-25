@@ -422,33 +422,21 @@ select {
 /* ─── Sign in ──────────────────────────────────────────────────────────────── */
 
 .signin {
-  position: relative;
   min-height: 100dvh;
-  display: flex;
-  align-items: flex-end;
   padding: var(--gutter);
+  padding-top: clamp(4rem, 22vh, 14rem);
   padding-bottom: max(var(--gutter), env(safe-area-inset-bottom));
-  overflow: hidden;
 }
 
-.signin-sky {
-  position: absolute;
-  inset: 0;
-  background: url("/night.jpg") center 30% / cover no-repeat;
-}
-
-.signin-sky::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(2, 4, 6, 0.1) 0%, rgba(2, 4, 6, 0.35) 40%, rgba(2, 4, 6, 0.94) 72%);
-}
-
+/* Anchored from the top, so a notice or the dev form grows downward and nothing above it moves. */
 .signin-body {
-  position: relative;
   width: 100%;
   max-width: 600px;
-  margin: 0 auto 4vh;
+  margin: 0 auto;
+}
+
+.signin .notice {
+  margin-top: 1.5rem;
 }
 
 .signin-footer {
