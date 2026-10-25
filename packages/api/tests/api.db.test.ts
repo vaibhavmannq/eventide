@@ -64,8 +64,14 @@ beforeAll(async () => {
 afterAll(() => db.close());
 
 describe('the basics', () => {
-  it('answers health checks without signing in', async () => {
-    expect(await call('GET', '/health')).toMatchObject({ status: 200, json: { ok: true } });
+  it('answers health checks without signing in, having reached the database', async () => {
+    expect(await call('GET', '/health')).toMatchObject({ status: 200, json: { ok: true, database: { ok: true } } });
+  });
+
+  it('fails the health check when the database cannot be reached', async () => {
+    const broken = { connect: () => Promise.reject(new Error('no route to host')) };
+    const response = await app.request(`${ORIGIN}/api/health`, {}, { db: broken, config: config() });
+    expect(response.status).toBe(500);
   });
 
   it('asks for sign-in, in the standard error shape', async () => {
