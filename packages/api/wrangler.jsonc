@@ -19,7 +19,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "00000000000000000000000000000000",
+      "id": "997b270675d7454a9a572cdc78aade0f",
       "localConnectionString": "postgres://eventide_api_dev:eventide_api_dev@localhost:5432/eventide_dev"
     }
   ],
