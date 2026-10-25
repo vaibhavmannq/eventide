@@ -1,5 +1,5 @@
 import { onLink } from '../lib/router.ts';
-import { scrolled } from '../lib/sky.ts';
+import { scrolled } from '../lib/scroll.ts';
 import { me, online, outbox, pendingCount, signOut, syncing } from '../lib/store.ts';
 
 /** The top line: home on the left; on the right, whether everything is saved. */

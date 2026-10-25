@@ -1,8 +1,5 @@
 import type { JSX } from 'preact';
-import { Moon } from './components/Moon.tsx';
-import { moonTonight } from './lib/moonphase.ts';
 import { match, path } from './lib/router.ts';
-import { sky } from './lib/sky.ts';
 import { me } from './lib/store.ts';
 import { ExpenseForm } from './screens/ExpenseForm.tsx';
 import { GroupScreen } from './screens/Group.tsx';
@@ -10,6 +7,7 @@ import { Groups } from './screens/Groups.tsx';
 import { Join } from './screens/Join.tsx';
 import { NewGroup } from './screens/NewGroup.tsx';
 import { People } from './screens/People.tsx';
+import { Privacy } from './screens/Privacy.tsx';
 import { SignIn } from './screens/SignIn.tsx';
 
 /** Every screen and its address. The first pattern that matches wins; anything else is the list of groups. */
@@ -22,26 +20,8 @@ const routes: [string, (p: Record<string, string>) => JSX.Element][] = [
   ['/groups/:id', (p) => <GroupScreen id={p.id ?? ''} />],
 ];
 
-/** Tonight's real moon, small and crisp in the corner of the sky: the "tonight" sky only. */
-function SkyMoon() {
-  if (sky.value !== 'tonight') return null;
-  return (
-    <div class="sky-moon">
-      <Moon lit={moonTonight().lit} size={56} />
-    </div>
-  );
-}
-
 export function App() {
-  return (
-    <>
-      <SkyMoon />
-      <Screen />
-    </>
-  );
-}
-
-function Screen() {
+  if (match('/privacy', path.value)) return <Privacy />; // readable without signing in
   if (me.value === undefined) return <main class="page" aria-busy="true" />;
   if (me.value === null) return <SignIn />;
   for (const [pattern, screen] of routes) {
