@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Production is whatever is on main, reviewed and merged; a branch can be run by mistake from the menu.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     steps:
