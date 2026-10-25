@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../../db/tests/harness.ts';
 import { app } from '../src/app.ts';
-import type { Config, OAuthProvider } from '../src/config.ts';
+import { type Config, google, type OAuthProvider } from '../src/config.ts';
 
 /**
  * The API end to end: real requests through every middleware, the ledger and the store, against Postgres.
@@ -506,5 +506,29 @@ describe('protecting the free allowances', () => {
     );
     expect(health.status).toBe(429);
     expect(seen).toEqual(['ip:203.0.113.9']);
+  });
+});
+
+describe('the Google provider', () => {
+  const answer =
+    (body: unknown, ok = true) =>
+    async () =>
+      ok ? Response.json(body) : new Response('no', { status: 401 });
+
+  it('reads a verified email and the name from Google', async () => {
+    const provider = google('id', 'secret');
+    expect(
+      await provider.profile('t', answer({ email: 'Priya@Example.com', email_verified: true, name: 'Priya' }) as never),
+    ).toEqual({ email: 'Priya@Example.com', name: 'Priya' });
+  });
+
+  it('refuses an email Google has not verified, and a failed lookup', async () => {
+    const provider = google('id', 'secret');
+    expect(await provider.profile('t', answer({ email: 'p@example.com', email_verified: false }) as never)).toBeNull();
+    expect(await provider.profile('t', answer({}, false) as never)).toBeNull();
+  });
+
+  it('asks Google for only the basics: who you are and your email', () => {
+    expect(google('id', 'secret').scope).toBe('openid email profile');
   });
 });

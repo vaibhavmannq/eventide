@@ -82,29 +82,76 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The portfolio's night sea, faint and still behind every screen, so the page is a place and not flat black.
-   Blurred to a glow of sky and sea; a gradient keeps the lower half, where the lists are, dark enough for the text
-   (portfolio spec §3.4: a soft scene-wide gradient, never a panel). */
+/* The sky behind every screen. Five versions to choose between on a real phone, switched with ?sky=… (lib/sky.ts);
+   whichever is chosen stays, and the rest go. Every version keeps the lower half, where the lists are, dark enough
+   for the text (portfolio spec §3.4: a soft scene-wide gradient, never a panel). */
 body::before {
   content: "";
   position: fixed;
-  inset: -48px; /* past the edges, so the blur has no fade at the borders */
+  inset: 0;
   z-index: -1;
-  /* Blurred to a glow: the photo's own moon must not become a second moon beside the app's (one focal point). */
-  filter: blur(22px);
-  background:
-    linear-gradient(to bottom, rgba(2, 4, 6, 0.35) 0%, rgba(2, 4, 6, 0.72) 45%, rgba(2, 4, 6, 0.9) 100%),
-    url("/night.jpg") center 25% / cover no-repeat;
-  opacity: 0.85;
   pointer-events: none;
 }
 
+/* glow: the portfolio's sea, blurred so its moon is a glow, not a second moon. */
+:root[data-sky="glow"] body::before {
+  inset: -48px; /* past the edges, so the blur has no fade at the borders */
+  filter: blur(22px);
+  opacity: 0.85;
+  background:
+    linear-gradient(to bottom, rgba(2, 4, 6, 0.35) 0%, rgba(2, 4, 6, 0.72) 45%, rgba(2, 4, 6, 0.9) 100%),
+    url("/night.jpg") center 25% / cover no-repeat;
+}
+
+/* clear: the sea as the portfolio shows it, sharp, darker under the text. */
+:root[data-sky="clear"] body::before {
+  background:
+    linear-gradient(to bottom, rgba(2, 4, 6, 0.45) 0%, rgba(2, 4, 6, 0.78) 50%, rgba(2, 4, 6, 0.93) 100%),
+    url("/night.jpg") center 25% / cover no-repeat;
+}
+
+/* sea: only the water and the horizon; the moon is above the top of the screen, its light still on the sea. */
+:root[data-sky="sea"] body::before {
+  background:
+    linear-gradient(to bottom, rgba(2, 4, 6, 0.45) 0%, rgba(2, 4, 6, 0.72) 45%, rgba(2, 4, 6, 0.92) 100%),
+    url("/night.jpg") center bottom / auto 260% no-repeat;
+}
+
+/* tonight and none: no photo, a night sky. "tonight" adds tonight's real moon, drawn small in the corner. */
+:root[data-sky="tonight"] body::before,
+:root[data-sky="none"] body::before {
+  background:
+    radial-gradient(60% 45% at 85% 0%, rgba(42, 85, 96, 0.55), transparent 70%),
+    radial-gradient(90% 60% at 50% 115%, rgba(14, 40, 46, 0.5), transparent 70%);
+}
+
 @media (min-aspect-ratio: 1 / 1) {
-  body::before {
+  :root[data-sky="glow"] body::before {
     background:
       linear-gradient(to bottom, rgba(2, 4, 6, 0.4) 0%, rgba(2, 4, 6, 0.78) 50%, rgba(2, 4, 6, 0.92) 100%),
       url("/night-wide.jpg") center 30% / cover no-repeat;
   }
+
+  :root[data-sky="clear"] body::before {
+    background:
+      linear-gradient(to bottom, rgba(2, 4, 6, 0.5) 0%, rgba(2, 4, 6, 0.8) 50%, rgba(2, 4, 6, 0.93) 100%),
+      url("/night-wide.jpg") center 30% / cover no-repeat;
+  }
+
+  :root[data-sky="sea"] body::before {
+    background:
+      linear-gradient(to bottom, rgba(2, 4, 6, 0.45) 0%, rgba(2, 4, 6, 0.75) 50%, rgba(2, 4, 6, 0.92) 100%),
+      url("/night-wide.jpg") center bottom / 170% auto no-repeat;
+  }
+}
+
+.sky-moon {
+  position: fixed;
+  top: max(4.5rem, calc(env(safe-area-inset-top) + 3.5rem));
+  right: var(--gutter);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.9;
 }
 
 a {
@@ -238,7 +285,14 @@ select {
   align-items: center;
   gap: 1rem;
   padding: max(16px, env(safe-area-inset-top)) var(--gutter) 16px;
-  background: linear-gradient(to bottom, var(--night) 0%, rgba(2, 4, 6, 0.85) 60%, transparent);
+  /* Clear at the top of the page, so there is no band over the sky; it darkens only once something scrolls
+     under it, to keep the line readable. */
+  background: transparent;
+  transition: background-color 0.25s;
+}
+
+.topbar.scrolled {
+  background-color: rgba(2, 4, 6, 0.82);
 }
 
 .topbar-right {

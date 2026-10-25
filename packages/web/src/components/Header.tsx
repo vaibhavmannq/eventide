@@ -1,4 +1,5 @@
 import { onLink } from '../lib/router.ts';
+import { scrolled } from '../lib/sky.ts';
 import { me, online, outbox, pendingCount, signOut, syncing } from '../lib/store.ts';
 
 /** The top line: home on the left; on the right, whether everything is saved. */
@@ -12,7 +13,7 @@ export function Header({ back }: { back?: { to: string; label: string } }) {
         ? 'Saving…'
         : 'All saved';
   return (
-    <header class="topbar">
+    <header class={scrolled.value ? 'topbar scrolled' : 'topbar'}>
       {back ? (
         <a class="mono link" href={back.to} onClick={(e) => onLink(e, back.to)}>
           ← {back.label}

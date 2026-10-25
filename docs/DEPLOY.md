@@ -63,8 +63,26 @@ Free tiers used: Neon (database), Cloudflare Workers and Hyperdrive (server), Gi
 3. Cloudflare → **Workers & Pages → eventide → Settings → Variables and Secrets → Add**: `GITHUB_CLIENT_ID` and
    `GITHUB_CLIENT_SECRET`, both of type **Secret**.
 
-Sign in with Google works the same way (Google Cloud console → OAuth client, callback
-`/api/auth/google/callback`, secrets `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`) and can come later.
+## 4. Sign in with Google
+
+The code is in place; the "Sign in with Google" button appears as soon as these two secrets exist.
+
+1. **Project.** [console.cloud.google.com](https://console.cloud.google.com) → the project picker at the top →
+   **New project** → name `Eventide` → Create, and make sure it is selected.
+2. **Consent screen.** **APIs & Services → OAuth consent screen** (on newer consoles: **Google Auth Platform →
+   Branding**). App name `Eventide`, your email as support and developer contact. Audience: **External**.
+   Data access / scopes: only `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`: the basic
+   ones, which need no review by Google.
+3. **Publish.** Under **Audience**, press **Publish app** so it is "In production". In "Testing", only test users
+   you list can sign in, and their sign-ins expire after a week.
+4. **Client.** **Credentials** (or **Clients**) → **Create credentials → OAuth client ID** → **Web application**,
+   name `Eventide`.
+   - Authorised JavaScript origins: `https://eventide.<your-subdomain>.workers.dev`
+   - Authorised redirect URIs: `https://eventide.<your-subdomain>.workers.dev/api/auth/google/callback`
+5. Copy the **Client ID** and **Client secret** into Cloudflare → **Workers & Pages → eventide → Settings →
+   Variables and Secrets** as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, both of type **Secret**.
+
+A person who signs in with Google and with GitHub using the same verified email is the same account.
 
 ## Protecting the free allowances
 
