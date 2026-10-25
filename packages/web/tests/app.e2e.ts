@@ -302,3 +302,11 @@ test('a change whose request is dropped is retried within seconds, not at the ne
   await expect(alice.getByText('All saved')).toBeVisible(); // well inside the default 5 s
   expect(dropped).toBe(2); // the dropped attempt, then the retry that got through
 });
+
+test('the privacy policy is readable without signing in, and linked from the sign-in screen', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Privacy' }).click();
+  await expect(page.getByRole('heading', { name: 'What Eventide keeps, and why' })).toBeVisible();
+  await page.goto('/privacy');
+  await expect(page.getByRole('heading', { name: 'What Eventide keeps, and why' })).toBeVisible();
+});

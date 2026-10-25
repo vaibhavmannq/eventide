@@ -41,6 +41,11 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
           )}
         </div>
         {p.dev && <DevSignIn next={next} />}
+        <p class="signin-footer">
+          <a class="mono link" href="/privacy">
+            Privacy
+          </a>
+        </p>
       </div>
     </main>
   );

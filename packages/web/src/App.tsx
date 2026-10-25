@@ -7,6 +7,7 @@ import { Groups } from './screens/Groups.tsx';
 import { Join } from './screens/Join.tsx';
 import { NewGroup } from './screens/NewGroup.tsx';
 import { People } from './screens/People.tsx';
+import { Privacy } from './screens/Privacy.tsx';
 import { SignIn } from './screens/SignIn.tsx';
 
 /** Every screen and its address. The first pattern that matches wins; anything else is the list of groups. */
@@ -20,6 +21,7 @@ const routes: [string, (p: Record<string, string>) => JSX.Element][] = [
 ];
 
 export function App() {
+  if (match('/privacy', path.value)) return <Privacy />; // readable without signing in
   if (me.value === undefined) return <main class="page" aria-busy="true" />;
   if (me.value === null) return <SignIn />;
   for (const [pattern, screen] of routes) {
