@@ -6,8 +6,17 @@ Eventide is a portfolio project about getting an ordinary thing exactly right: m
 penny, many people editing one group at once, phones that go offline, and every reliability claim backed by a
 test or a measurement. It runs entirely on free tiers.
 
-**Status:** live at https://eventide.vaibhavmann-10.workers.dev. Phases 0–3 of 5 are built: the ledger core, the
-Postgres database, the API, and the app (installable, works offline). Load and crash tests are next.
+**Status:** live at https://eventide.vaibhavmann-10.workers.dev. Phases 0–4 of 5 are done: the ledger, the
+database, the API, the app, and the proof below. A case study on the portfolio is last.
+
+## Proven, not claimed ([docs/PERFORMANCE.md](docs/PERFORMANCE.md))
+
+- **Crash test:** 20 writers, 800 expenses, the server killed with SIGKILL 15 times mid-write: **800 in the
+  ledger, 0 lost, 0 duplicated**, and the test does fail if idempotency is switched off. Runs in CI.
+- **Load:** 6 ms reads and 8 ms writes (p50) unloaded; about 500 requests/s on 4 shared cores with no errors;
+  **1.5–2.8 ms of server CPU per request** against the Worker's 10 ms limit.
+- **A measured optimisation:** one busy group went from 95 to about 135 writes/s by holding its lock for three
+  round trips instead of nine.
 
 ## What's here
 
@@ -79,6 +88,8 @@ npm run test:db     # integration and API tests against Postgres (see docs/DATAB
 cp packages/api/.dev.vars.example packages/api/.dev.vars
 npm run dev                # builds the app, serves everything on http://127.0.0.1:8787
 npm run e2e                # end-to-end tests in Chromium, phone and laptop sizes
+npm run crash              # kill the server mid-write; prove nothing is lost or doubled
+npm run load               # throughput, latency and CPU per request at rising concurrency
 node --experimental-strip-types scripts/smoke.ts http://localhost:8787
 node --experimental-strip-types scripts/bench-settle.ts
 ```

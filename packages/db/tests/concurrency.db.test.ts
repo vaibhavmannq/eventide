@@ -5,6 +5,7 @@ import {
   changesSince,
   editTransaction,
   getBalances,
+  leaveGroup,
   type Pool,
   type PoolClient,
   recordTransaction,
@@ -134,5 +135,54 @@ describe('many people writing to one group at once', () => {
     const [a, b] = await Promise.all([alice, bob]);
     expect([a.seq, b.seq]).toEqual([1, 2]);
     expect((await changesSince(db.app, f.bob, f.groupId, 0)).map((change) => change.seq)).toEqual([1, 2]);
+  });
+
+  it('never lets someone leave while an expense naming them is being saved', async () => {
+    // Bob's expense is held after the membership check and before it writes anything. Bob tries to leave
+    // meanwhile: the share lock on his member row makes him wait, and once the expense lands he owes money, so
+    // leaving is refused. Without the lock he could leave with a zero balance a moment before a debt was written
+    // against him.
+    let release = () => {};
+    let atCommit = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reachedCommit = new Promise<void>((resolve) => {
+      atCommit = resolve;
+    });
+    const held: Pool = {
+      async connect() {
+        const client = await db.app.connect();
+        return {
+          release: (destroy) => client.release(destroy),
+          query: async (text: string, values?: readonly unknown[]) => {
+            if (text.trimStart().startsWith('with g as')) {
+              atCommit();
+              await released;
+            }
+            return client.query(text, values as unknown[]);
+          },
+        } as PoolClient;
+      },
+    };
+    const expense = recordTransaction(held, f.alice, {
+      groupId: f.groupId,
+      ...newIds(),
+      description: 'Held',
+      occurredOn: '2026-10-25',
+      transaction: dinner(f.members),
+    });
+    await reachedCommit;
+    const leaving = leaveGroup(db.app, f.bob, f.groupId).then(
+      () => 'left',
+      (error: { code?: string }) => error.code,
+    );
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    } finally {
+      release();
+    }
+    await expense;
+    expect(await leaving).toBe('NOT_SETTLED');
   });
 });

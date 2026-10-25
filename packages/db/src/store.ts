@@ -124,18 +124,43 @@ export async function listMembers(pool: Pool, userId: string, groupId: string): 
   });
 }
 
-/** Adds an expense or a payment. */
+/**
+ * Adds an expense or a payment.
+ *
+ * Built so the group's row lock (which orders the change feed, §7) is held for as little time as possible:
+ * membership is checked first under share locks on the member rows (several writes can hold those at once; leaving
+ * the group must wait for them), and then the lock, the sequence number and all four inserts happen in a single
+ * statement. The lock is held for three round trips (that statement, storing the answer, commit) instead of
+ * about nine. Measured in docs/PERFORMANCE.md.
+ */
 export async function recordTransaction(pool: Pool, userId: string, input: RecordInput): Promise<TransactionView> {
   return asUser(pool, userId, (sql) =>
     idempotent(sql, userId, input.idempotencyKey, { op: 'record', ...input }, async () => {
-      const seq = await nextSeq(sql, input.groupId);
       const postings = await validate(sql, input.groupId, input.transaction);
-
-      const inserted = await sql.query(
-        `insert into transactions
-           (id, group_id, kind, revision, description, occurred_on, currency, body, created_by, updated_by)
-         values ($1, $2, $3, 1, $4, $5, $6, $7, $8, $8)
-         on conflict (id) do nothing`,
+      // Amounts go over the wire as text so nothing passes through a float on the way to bigint.
+      const { rows } = await sql.query<{ seq: string | null; inserted: boolean }>(
+        `with g as (
+           update groups set seq = seq + 1 where id = $2 returning seq
+         ), t as (
+           insert into transactions
+             (id, group_id, kind, revision, description, occurred_on, currency, body, created_by, updated_by)
+           select $1, $2, $3, 1, $4, $5, $6, $7, $8, $8 from g
+           on conflict (id) do nothing
+           returning id
+         ), e as (
+           insert into entries (group_id, seq, kind, transaction_id, revision, created_by)
+           select $2, g.seq, 'create', t.id, 1, $8 from g, t
+           returning id
+         ), r as (
+           insert into transaction_revisions
+             (transaction_id, group_id, revision, entry_id, deleted, description, occurred_on, currency, body)
+           select $1, $2, 1, e.id, false, $4, $5, $6, $7 from e
+         ), p as (
+           insert into postings (entry_id, group_id, member_id, currency, amount)
+           select e.id, $2, p.member, p.currency, p.amount::bigint
+           from e, unnest($9::uuid[], $10::text[], $11::text[]) as p (member, currency, amount)
+         )
+         select (select seq::text from g) as seq, exists (select 1 from t) as inserted`,
         [
           input.id,
           input.groupId,
@@ -145,12 +170,15 @@ export async function recordTransaction(pool: Pool, userId: string, input: Recor
           input.transaction.currency,
           input.transaction,
           userId,
+          postings.map((p) => p.member),
+          postings.map((p) => p.currency),
+          postings.map((p) => String(p.amount)),
         ],
       );
-      if (inserted.rowCount === 0) throw new StoreError('ALREADY_EXISTS', `Transaction ${input.id} already exists`);
-
-      await appendEntry(sql, userId, { ...input, seq, kind: 'create', revision: 1, deleted: false, postings });
-      return view(input, { revision: 1, deleted: false, seq });
+      const result = one(rows);
+      if (result.seq === null) throw new StoreError('NOT_FOUND', 'No such group');
+      if (!result.inserted) throw new StoreError('ALREADY_EXISTS', `Transaction ${input.id} already exists`);
+      return view(input, { revision: 1, deleted: false, seq: Number(result.seq) });
     }),
   );
 }
@@ -315,9 +343,13 @@ async function visibleGroup(sql: Queryable, groupId: string): Promise<void> {
 /** Runs the ledger rules and checks everyone named is an active member. Returns the postings to write. */
 async function validate(sql: Queryable, groupId: string, transaction: Transaction): Promise<Posting[]> {
   const postings = toPostings(transaction);
-  const { rows } = await sql.query<{ id: string }>('select id from members where group_id = $1 and left_at is null', [
-    groupId,
-  ]);
+  // FOR SHARE: until this transaction ends, nobody can leave or be removed (that updates their row), but other
+  // writes, which take the same share locks, carry on in parallel.
+  const { rows } = await sql.query<{ id: string }>(
+    'select id from members where group_id = $1 and left_at is null for share',
+    [groupId],
+  );
+  if (rows.length === 0) throw new StoreError('NOT_FOUND', 'No such group'); // or not yours: row-level security
   const active = new Set(rows.map((row) => row.id));
   for (const member of membersNamed(transaction)) {
     if (!active.has(member)) throw new StoreError('UNKNOWN_MEMBER', `${member} is not a member of this group`);
@@ -397,8 +429,9 @@ async function appendEntry(
   );
   const entryId = one(rows).id;
   await sql.query(
-    `insert into transaction_revisions (transaction_id, revision, entry_id, deleted, description, occurred_on, currency, body)
-     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `insert into transaction_revisions
+       (transaction_id, group_id, revision, entry_id, deleted, description, occurred_on, currency, body)
+     values ($1, $9, $2, $3, $4, $5, $6, $7, $8)`,
     [
       entry.id,
       entry.revision,
@@ -408,6 +441,7 @@ async function appendEntry(
       entry.occurredOn,
       entry.transaction.currency,
       entry.transaction,
+      entry.groupId,
     ],
   );
   if (entry.postings.length === 0) return;

@@ -32,7 +32,8 @@ Every read here is a cheap indexed query, so there is nothing worth the risk of 
 
 ## Consequences
 
-- Hyperdrive's free plan allows 100,000 queries a day, roughly 7,000 writes. If that is ever close, each write
-  becomes a single SQL function call (one round trip instead of about thirteen), measured before and after.
+- Hyperdrive's free plan allows 100,000 queries a day. A write was about 13 queries; recording an expense now
+  takes about 8 (the lock and all inserts in one statement, docs/PERFORMANCE.md), roughly 12,000 writes a day.
+  If that is ever close, the rest of the write can move into one SQL function, measured before and after.
 - Moving off Cloudflare means swapping `worker.ts` for a Node entry point that builds a `pg.Pool`; `app.ts`, the
   store and the ledger do not change.

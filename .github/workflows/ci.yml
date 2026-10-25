@@ -77,6 +77,9 @@ jobs:
       - name: Integration tests against Postgres 16
         run: npm run test:db
 
+      - name: Crash test (server killed mid-write; nothing lost or doubled)
+        run: npm run crash -- 10 20 8
+
   end-to-end:
     runs-on: ubuntu-latest
     services:
