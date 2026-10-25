@@ -78,6 +78,7 @@ worst a stranger can do is take Eventide offline for a while. Three things make 
   Secrets) so you can never lock yourself out. To open sign-up to everyone, add a variable `SIGNUPS` = `open`.
 - **Rate limits** (`ratelimits` in wrangler.jsonc): 300 requests a minute per IP address, 120 per signed-in person.
   Real use is a few a minute. Over the limit the API answers 429 and the app keeps the change and retries later.
+  Local development and CI set `RATE_LIMITS=off` in `.dev.vars`: there every test browser looks like one address.
 - **Watching:** Cloudflare → Workers & Pages → eventide → Metrics shows requests per day; Neon → Monitoring shows
   compute hours. To sign someone out everywhere, run `delete from sessions where user_id = '…'` in Neon's SQL
   Editor, and remove them from their groups.

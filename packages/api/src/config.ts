@@ -29,7 +29,7 @@ export interface Config {
    * Rate limits (Cloudflare's rate limiting binding in the Worker). Returns false when `key` is over its limit.
    * Absent: no limits (tests, and the Node entry point unless given one).
    */
-  limit?: (bucket: 'ip' | 'user', key: string) => Promise<boolean>;
+  limit?: ((bucket: 'ip' | 'user', key: string) => Promise<boolean>) | undefined;
   /** Sign in by typing an email, with no provider. Local development and tests only; never set in production. */
   devLogin: boolean;
   /** Injected so tests can stand in for GitHub and Google. */
