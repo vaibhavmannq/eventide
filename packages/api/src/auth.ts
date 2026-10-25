@@ -1,4 +1,14 @@
-import { createSession, deleteSession, newToken, sha256, type User, upsertUser, userForSession } from '@eventide/db';
+import {
+  createSession,
+  deleteSession,
+  inviteIsValid,
+  newToken,
+  sha256,
+  type User,
+  upsertUser,
+  userExists,
+  userForSession,
+} from '@eventide/db';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Bindings, ProviderName } from './config.ts';
@@ -24,11 +34,29 @@ export const requireUser: MiddlewareHandler<AppEnv> = async (c, next) => {
   const token = getCookie(c, SESSION, 'host');
   const user = token ? await userForSession(c.env.db, token) : null;
   if (!user) throw new HttpError(401, 'UNAUTHENTICATED', 'Sign in first');
+  if (c.env.config.limit && !(await c.env.config.limit('user', user.id))) throw tooMany();
   c.set('user', user);
   await next();
 };
 
-async function signIn(c: Parameters<MiddlewareHandler<AppEnv>>[0], email: string, name: string): Promise<User> {
+/** The invite token in a path like /join/<token>, if there is one. */
+const inviteIn = (path: string | undefined) => /^\/join\/([^/?#]+)/.exec(path ?? '')?.[1];
+
+export const tooMany = () => new HttpError(429, 'RATE_LIMITED', 'Too many requests. Try again in a minute.');
+
+async function signIn(
+  c: Parameters<MiddlewareHandler<AppEnv>>[0],
+  email: string,
+  name: string,
+  invite?: string,
+): Promise<User> {
+  const { signups } = c.env.config;
+  if (!signups.open && !(await userExists(c.env.db, email))) {
+    const listed = signups.allowedEmails.includes(email.toLowerCase());
+    if (!listed && !(invite && (await inviteIsValid(c.env.db, invite)))) {
+      throw new HttpError(403, 'INVITE_ONLY', 'Eventide is invite-only for now. Ask a friend for an invite link.');
+    }
+  }
   const user = await upsertUser(c.env.db, email, name);
   const { token, expiresAt } = await createSession(c.env.db, user.id);
   setCookie(c, SESSION, token, { ...secure, expires: expiresAt });
@@ -138,14 +166,19 @@ export const auth = new Hono<AppEnv>()
     const profile = await provider.profile(accessToken, c.env.config.fetch);
     if (!profile) return failed('no verified email');
 
-    await signIn(c, profile.email, profile.name);
+    try {
+      await signIn(c, profile.email, profile.name, inviteIn(flow.next));
+    } catch (error) {
+      if (error instanceof HttpError && error.code === 'INVITE_ONLY') return c.redirect('/?signin=invite-only', 302);
+      throw error;
+    }
     return c.redirect(flow.next, 302);
   })
 
   .post('/dev', async (c) => {
     if (!c.env.config.devLogin) throw new HttpError(404, 'NOT_FOUND', 'Not found');
-    const { email, name } = devLogin.parse(await c.req.json());
-    return c.json({ user: await signIn(c, email, name) });
+    const { email, name, next } = devLogin.parse(await c.req.json());
+    return c.json({ user: await signIn(c, email, name, inviteIn(next)) });
   })
 
   .post('/logout', async (c) => {

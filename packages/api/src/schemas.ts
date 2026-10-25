@@ -50,7 +50,7 @@ export const editBody = z.strictObject({ expectedRevision: z.int().min(1), ...de
 export const newGroup = z.strictObject({ name, currency, displayName: name });
 export const newMember = z.strictObject({ displayName: name });
 export const acceptBody = z.union([z.strictObject({ displayName: name }), z.strictObject({ claim: id })]);
-export const devLogin = z.strictObject({ email: z.email().max(200), name });
+export const devLogin = z.strictObject({ email: z.email().max(200), name, next: z.string().max(500).optional() });
 
 export const idempotencyKey = id;
 export const groupId = id;

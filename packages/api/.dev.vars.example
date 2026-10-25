@@ -1,5 +1,7 @@
 # Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
 DEV_LOGIN=true
+# Production is invite-only by default; locally, let anyone in.
+SIGNUPS=open
 # GITHUB_CLIENT_ID=
 # GITHUB_CLIENT_SECRET=
 # GOOGLE_CLIENT_ID=

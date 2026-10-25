@@ -66,6 +66,22 @@ Free tiers used: Neon (database), Cloudflare Workers and Hyperdrive (server), Gi
 Sign in with Google works the same way (Google Cloud console → OAuth client, callback
 `/api/auth/google/callback`, secrets `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`) and can come later.
 
+## Protecting the free allowances
+
+None of the free plans can charge you: there is no card on any of them. Past its limits, Cloudflare answers with an
+error page until midnight UTC, Hyperdrive refuses queries, and Neon suspends the database until next month. So the
+worst a stranger can do is take Eventide offline for a while. Three things make that hard:
+
+- **Invite-only sign-up (on by default).** A new account can only be created by someone arriving through a valid
+  invite link, or whose email is listed in the `ALLOWED_EMAILS` secret (comma-separated). Anyone with an account
+  can always sign in. Add your own email to `ALLOWED_EMAILS` (Cloudflare → eventide → Settings → Variables and
+  Secrets) so you can never lock yourself out. To open sign-up to everyone, add a variable `SIGNUPS` = `open`.
+- **Rate limits** (`ratelimits` in wrangler.jsonc): 300 requests a minute per IP address, 120 per signed-in person.
+  Real use is a few a minute. Over the limit the API answers 429 and the app keeps the change and retries later.
+- **Watching:** Cloudflare → Workers & Pages → eventide → Metrics shows requests per day; Neon → Monitoring shows
+  compute hours. To sign someone out everywhere, run `delete from sessions where user_id = '…'` in Neon's SQL
+  Editor, and remove them from their groups.
+
 ## Never in production
 
 `DEV_LOGIN` lets anyone sign in as any email. It belongs only in `packages/api/.dev.vars` on your own machine.

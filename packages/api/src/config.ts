@@ -19,6 +19,17 @@ export type ProviderName = 'github' | 'google';
 
 export interface Config {
   providers: Partial<Record<ProviderName, OAuthProvider>>;
+  /**
+   * Who may create an account. Closed (the default): only someone arriving through a valid invite link, or whose
+   * email is listed. Anyone who already has an account can always sign in. Keeps strangers from spending the
+   * free allowances on accounts of their own.
+   */
+  signups: { open: boolean; allowedEmails: readonly string[] };
+  /**
+   * Rate limits (Cloudflare's rate limiting binding in the Worker). Returns false when `key` is over its limit.
+   * Absent: no limits (tests, and the Node entry point unless given one).
+   */
+  limit?: (bucket: 'ip' | 'user', key: string) => Promise<boolean>;
   /** Sign in by typing an email, with no provider. Local development and tests only; never set in production. */
   devLogin: boolean;
   /** Injected so tests can stand in for GitHub and Google. */

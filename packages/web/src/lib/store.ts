@@ -223,7 +223,8 @@ async function flush(): Promise<void> {
       const { transaction: view } = await send(item);
       await confirmed(item, view);
     } catch (error) {
-      if (isNetworkError(error) || (error instanceof ApiError && error.status >= 500)) throw error;
+      if (isNetworkError(error) || (error instanceof ApiError && (error.status >= 500 || error.status === 429)))
+        throw error;
       const message =
         error instanceof ApiError && error.code === 'CONFLICT'
           ? 'Someone else changed this at the same time, so this change was not saved.'

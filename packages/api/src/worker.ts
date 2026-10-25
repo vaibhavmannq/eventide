@@ -16,6 +16,17 @@ interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   /** "true" only in .dev.vars for local development. Never set it in production. */
   DEV_LOGIN?: string;
+  /** "open" lets anyone create an account; anything else (the default) means invite-only. */
+  SIGNUPS?: string;
+  /** Comma-separated emails that may create an account without an invite (yours, at least). */
+  ALLOWED_EMAILS?: string;
+  /** Cloudflare's rate limiting bindings (wrangler.jsonc, `ratelimits`). */
+  RL_IP?: RateLimit;
+  RL_USER?: RateLimit;
+}
+
+interface RateLimit {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
 interface ExecutionContext {
@@ -32,6 +43,17 @@ function configFrom(env: Env): Config {
   }
   return {
     providers,
+    signups: {
+      open: env.SIGNUPS === 'open',
+      allowedEmails: (env.ALLOWED_EMAILS ?? '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean),
+    },
+    limit: async (bucket, key) => {
+      const binding = bucket === 'ip' ? env.RL_IP : env.RL_USER;
+      return binding ? (await binding.limit({ key })).success : true;
+    },
     devLogin: env.DEV_LOGIN === 'true',
     fetch: (input, init) => fetch(input, init),
     log: (entry) => console.log(JSON.stringify(entry)),

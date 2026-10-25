@@ -351,7 +351,7 @@ Limits to know about:
 
 - ~~Frontend framework~~: Preact with signals, about 20 KB gzipped in all. Forms and lists are most of the app,
   and a component model pays for itself there; React's runtime would be five times the size for no gain.
-- Rate limiting: not built yet. Whether Cloudflare's rate limiting is usable on the free plan, or a per-user
-  counter in Postgres is needed.
+- ~~Rate limiting~~: Cloudflare's rate limiting binding, 300 requests a minute per IP and 120 per person, plus
+  invite-only sign-up (docs/DEPLOY.md, "Protecting the free allowances").
 - Leaving a group and removing a member (allowed only at a zero balance).
 - Placeholder members claiming their place: by invite link only, or also by matching email.
