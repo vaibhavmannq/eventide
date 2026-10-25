@@ -17,7 +17,9 @@
     "test:db": "vitest run -c vitest.db.config.ts",
     "db:migrate": "node --experimental-strip-types --no-warnings packages/db/src/cli.ts",
     "e2e": "playwright test",
-    "dev": "npm run build -w @eventide/web && npm run dev -w @eventide/api"
+    "dev": "npm run build -w @eventide/web && npm run dev -w @eventide/api",
+    "load": "node --experimental-strip-types --no-warnings scripts/proof/load.ts",
+    "crash": "node --experimental-strip-types --no-warnings scripts/proof/crash.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
