@@ -211,3 +211,71 @@ test('leaving needs a zero balance; the creator can delete the group for everyon
   await expect(alice.getByRole('heading', { name: /Good/ })).toBeVisible();
   await expect(alice.getByRole('link', { name: /Old trip/ })).toHaveCount(0);
 });
+
+/** Alice's group with Bob and Sam added by name, open on a new expense. */
+async function newExpenseInThree(browser: Browser, group: string) {
+  const alice = await person(browser, 'Alice');
+  await alice.getByRole('link', { name: /New group/ }).click();
+  await alice.getByLabel('Group name').fill(group);
+  await alice.getByRole('button', { name: 'Create group' }).click();
+  await alice.getByRole('link', { name: 'People & invite' }).click();
+  for (const name of ['Bob', 'Sam']) {
+    await alice.getByLabel('Name', { exact: true }).fill(name);
+    await alice.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(alice.getByText(name, { exact: true })).toBeVisible();
+  }
+  await alice.getByRole('link', { name: `← ${group}` }).click();
+  await alice.getByRole('link', { name: /Add expense/ }).click();
+  return alice;
+}
+
+const field = (page: Page, label: string) => page.getByLabel(label.replace("'", '’')).or(page.getByLabel(label));
+
+test('splits by percentage, saying how much is left to assign', async ({ browser }) => {
+  const alice = await newExpenseInThree(browser, 'Percent flat');
+  await alice.getByLabel('Amount', { exact: true }).fill('1000');
+  await alice.getByText('Percent', { exact: true }).click();
+  await field(alice, "Alice's percentage").fill('50');
+  await field(alice, "Bob's percentage").fill('25');
+  await field(alice, "Sam's percentage").fill('24.5');
+  await expect(alice.getByText('0.5% still to assign')).toBeVisible();
+  await field(alice, "Sam's percentage").fill('25.5');
+  await expect(alice.getByText('0.5% over 100%')).toBeVisible();
+  await field(alice, "Sam's percentage").fill('25');
+  await expect(alice.getByText('Alice paid ₹1,000.00, split 3 ways.')).toBeVisible();
+  await expect(alice.locator('.split-row', { hasText: 'Bob' }).getByText('₹250.00')).toBeVisible();
+  await alice.getByRole('button', { name: 'Add expense' }).click();
+  await expect(alice.getByText('You’re owed ₹500.00')).toBeVisible();
+
+  // Editing shows the percentages as they were entered.
+  await alice.getByRole('link', { name: /Alice paid ₹1,000.00/ }).click();
+  await expect(field(alice, "Sam's percentage")).toHaveValue('25');
+});
+
+test('several people can pay one bill', async ({ browser }) => {
+  const alice = await newExpenseInThree(browser, 'Dinner for three');
+  await alice.getByLabel('Amount', { exact: true }).fill('900');
+  await alice.getByLabel('What for').fill('Dinner');
+  await alice.getByLabel('Paid by').selectOption({ label: 'Several people…' });
+  await field(alice, 'Alice paid').fill('600');
+  await field(alice, 'Bob paid').fill('200');
+  await expect(alice.getByText('₹100.00 of the payment still to assign')).toBeVisible();
+  await field(alice, 'Bob paid').fill('400');
+  await expect(alice.getByText('The payments are ₹100.00 more than the total')).toBeVisible();
+  await field(alice, 'Bob paid').fill('300');
+  await expect(alice.getByText('Alice and Bob paid ₹900.00, split 3 ways.')).toBeVisible();
+  await shot(alice, '12-several-payers');
+  await alice.getByRole('button', { name: 'Add expense' }).click();
+
+  // Alice paid 600 and owes 300; Bob paid 300 and owes 300; Sam owes 300.
+  await expect(alice.getByText('You’re owed ₹300.00')).toBeVisible();
+  await expect(alice.getByText('Alice and Bob paid ₹900.00')).toBeVisible();
+  await expect(alice.locator('.settle-row')).toHaveCount(1);
+  await expect(alice.locator('.settle-row')).toContainText('Sam pays you');
+  await expect(alice.getByText('All saved')).toBeVisible();
+
+  // Editing opens with both payers filled in.
+  await alice.getByRole('link', { name: /Dinner/ }).click();
+  await expect(alice.getByLabel('Paid by')).toHaveValue('several');
+  await expect(field(alice, 'Bob paid')).toHaveValue('300.00');
+});
