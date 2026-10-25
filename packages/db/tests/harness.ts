@@ -53,6 +53,9 @@ export async function createTestDatabase(options: { migrated?: boolean } = {}): 
     connectionString: urlFor(name, { name: APP_LOGIN, password: APP_PASSWORD }),
     max: 20,
   });
+  // Dropping the database at the end terminates connections that are still closing; the pool reports that as an
+  // error on an idle client. It is expected, and unhandled it would fail the run.
+  for (const pool of [owner, app]) pool.on('error', () => {});
   return {
     name,
     owner,
