@@ -24,16 +24,27 @@ Free tiers used: Neon (database), Cloudflare Workers and Hyperdrive (server), Gi
    Create this role in the SQL Editor, not on Neon's Roles page: roles made there get administrator rights,
    and the whole point of `eventide_api` is that it has almost none (docs/DATABASE.md).
 
+   Use only letters and digits in the password (32 or more of them): characters like `@ : / ? #` break
+   connection strings. To check it worked, run `select rolname from pg_roles where rolname like 'eventide%';`
+   and expect `eventide_app` and `eventide_api`.
+
 ## 2. Cloudflare: the server
 
-1. **Hyperdrive.** Cloudflare dashboard → **Storage & databases → Hyperdrive → Create configuration**. Name
-   `eventide`. Connection string: the direct one from step 1.2, with the user and password replaced by
-   `eventide_api` and its password:
-   `postgresql://eventide_api:PASSWORD@ep-....neon.tech/neondb?sslmode=require`.
+1. **Hyperdrive.** Cloudflare dashboard → **Storage & databases → Hyperdrive → Create configuration →
+   Connect to public database** (Neon is reachable over the internet with TLS; the private options are for
+   databases inside your own network). Name `eventide`, and the connection details of `eventide_api`, never the
+   owner:
+   - host: the Neon host from step 1.2, without `-pooler` (e.g. `ep-…-…​.c-3.ap-southeast-1.aws.neon.tech`)
+   - port `5432`, database `neondb`, user `eventide_api`, password: the one from step 1.5
+
+   **Turn query caching off.** Hyperdrive caches read queries by default, and does not know about row-level
+   security: a cached result for one user could be served to another, and balances would lag behind writes by up
+   to a minute. Eventide's reads are cheap indexed queries; it needs no cache.
+
    Create it, then copy its **ID** into `packages/api/wrangler.jsonc` (`hyperdrive[0].id`). The ID is not a
    secret.
-2. **Placement.** In `wrangler.jsonc`, set `placement.region` to the Neon region, for example
-   `aws:ap-southeast-1`, so the server runs next to the database.
+2. **Placement.** `placement.region` in `wrangler.jsonc` must match the Neon region (currently
+   `aws:ap-southeast-1`, Singapore), so the server runs next to the database.
 3. **API token for deploys.** Cloudflare → **My Profile → API Tokens → Create Token → Edit Cloudflare Workers**
    template → your account → Create. Add it to GitHub secrets as `CLOUDFLARE_API_TOKEN`.
 4. **Account ID.** Cloudflare → **Workers & Pages**: the account ID is in the right-hand column. Add it to
