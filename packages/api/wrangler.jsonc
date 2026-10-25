@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "eventide",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  // node-postgres needs Node's net, crypto and buffer modules, which Workers provide with this flag.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The app's files. /api/* always reaches the Worker; any other path is a file, or index.html for app routes.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "single-page-application"
+  },
+
+  // Created with: npx wrangler hyperdrive create eventide --connection-string="<Neon, as eventide_api>"
+  // The id is not a secret; the connection string lives only in Cloudflare.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://eventide_api_dev:eventide_api_dev@localhost:5432/eventide_dev"
+    }
+  ],
+
+  // Run the Worker next to the database, not next to the visitor: a write is several round trips to Postgres
+  // and only one to the visitor. Set to the Neon project's region once it exists, e.g. "aws:ap-southeast-1".
+  // "placement": { "region": "aws:..." },
+
+  "triggers": { "crons": ["17 3 * * *"] },
+  "observability": { "enabled": true }
+}

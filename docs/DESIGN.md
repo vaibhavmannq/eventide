@@ -59,29 +59,38 @@ offline, and every claim about reliability backed by a test or a measurement.
 
 ```mermaid
 flowchart LR
-  subgraph Phone or laptop
-    UI[Web app, PWA]
-    IDB[(IndexedDB:<br/>local copy + outbox)]
-    UI <--> IDB
+  App["Web app on your phone<br/>local copy + outbox"]
+  subgraph W["Cloudflare Worker"]
+    API["API: /api/*"]
+    Files["App files: everything else"]
+    Cron["Nightly audit"]
   end
-  UI -- HTTPS JSON --> API[API on Cloudflare Workers]
-  API -- SQL over HTTPS --> DB[(Neon Postgres)]
-  API --> Ledger[[@eventide/ledger<br/>pure TypeScript]]
-  UI --> Ledger
-  Cron[Workers cron: nightly audit] --> DB
+  HD["Hyperdrive<br/>pooled connections"]
+  DB[("Neon Postgres")]
+  App --> API
+  App --> Files
+  API --> HD
+  Cron --> HD
+  HD --> DB
 ```
 
 - **`@eventide/ledger`** (`packages/ledger`) — the money rules: splitting, postings, balances, settle-up. Pure
   functions with no I/O, used by both the API and the app, so a preview on the phone and the stored result
   are computed by the same code.
-- **API** — a stateless Worker. It authenticates the request, checks the person belongs to the group, runs the
-  ledger rules, and writes in one database transaction. No state lives in the Worker between requests.
+- **One Worker, one origin.** The same Cloudflare Worker serves the API under `/api/*` and the app's files for
+  every other path. Same origin means the session cookie is first-party (no cross-site cookies, which Safari
+  blocks) and there is no CORS to get wrong. The Worker is stateless: it authenticates the request, runs the
+  ledger rules, and writes in one database transaction. Its scheduled handler runs the nightly audit (§13).
+- **Hyperdrive** — Cloudflare's pool of warm connections to Neon. It lets the Worker use node-postgres, the same
+  driver the tests use, so the code that is tested is the code that runs. The Worker is placed in the database's
+  region: a write is about a dozen round trips to Postgres and one to the visitor, so the short side should be
+  the database one.
 - **Postgres** — the single source of truth. It enforces the money rules a second time (§5.3), so a bug in the
   API cannot write an unbalanced ledger.
 - **Web app** — keeps a local copy of each group and an outbox of changes not yet sent (§8).
 
-Why these pieces: [ADR 0001](decisions/0001-postgres-as-source-of-truth.md) and
-[ADR 0004](decisions/0004-free-tier-hosting.md).
+Why these pieces: [ADR 0001](decisions/0001-postgres-as-source-of-truth.md),
+[ADR 0004](decisions/0004-free-tier-hosting.md) and [ADR 0005](decisions/0005-one-worker-and-hyperdrive.md).
 
 ## 5. The ledger
 
@@ -203,7 +212,9 @@ idempotency_keys      (user_id, key, request_hash, response jsonb, created_at)
 - **Edits reverse what was written.** An edit's reversal is read from the postings actually stored for that
   transaction, not recomputed from its body, so a future change to the splitting rules can never make a
   reversal undo the wrong amount. There is a test that tampers with the body to prove it.
-- Sessions and invites arrive with the API (phase 2), in their own migration.
+- **`sessions` and `invites`** (migration 0002) store only SHA-256 hashes of their tokens. Joining by invite and
+  claiming a place made by name ("I'm Sam") run as security-definer functions, because the person joining
+  cannot yet see the group.
 
 ## 7. Writes: consistency and concurrency
 
@@ -250,13 +261,21 @@ become visible at commit time, so a reader can see 12 and 14 before 13 commits, 
 
 ## 9. Security and privacy
 
-- **Sign-in:** OAuth with Google or GitHub; no passwords stored. Sessions are random tokens in an `HttpOnly`,
-  `Secure`, `SameSite=Lax` cookie, stored hashed, revocable.
+- **Sign-in:** OAuth 2 with GitHub or Google, authorisation code flow with PKCE, and a `state` checked against a
+  short-lived cookie so a sign-in response only completes in the browser that started it (no login CSRF). Only a
+  verified email is accepted. No passwords are stored. After sign-in, the redirect only ever goes to a path on
+  this site.
+- **Sessions:** 32 random bytes in a `__Host-` cookie (`Secure`, `HttpOnly`, `SameSite=Lax`, path `/`, no
+  domain), stored as a SHA-256 hash, 30 days, deleted on sign-out.
+- **Cross-site requests:** every request that changes data must carry this site's own `Origin`; anything else
+  gets 403. Browsers set `Origin` themselves and a page elsewhere cannot fake it.
 - **Authorisation:** every query that touches a group goes through one function that first checks membership.
   As a second layer, Postgres row-level security restricts rows to groups the current user belongs to (the
   API sets the user id per transaction), so a missed check in the API still cannot read another group.
 - **Invites:** 128-bit random tokens, stored hashed, expiring, revocable.
-- **Input:** every request body is validated against a schema before it reaches the ledger.
+- **Input:** every request body is validated against a strict schema (unknown fields rejected, sizes capped,
+  64 KB body limit) before it reaches the ledger. Errors have one shape, `{ error: { code, message, details } }`,
+  and a 500 never includes internals; the log has them, under the request id.
 - **Data kept:** name, email, and what you enter. No analytics trackers.
 
 ## 10. Capacity and scaling
@@ -280,8 +299,8 @@ needed.
 
 | Service | Free allowance (checked 2026-10-25) | Eventide's use |
 |---|---|---|
-| Cloudflare Workers | 100,000 requests/day, 10 ms CPU per request, no card | API; roughly 5,000 sessions a day |
-| Cloudflare Pages | Static hosting | The web app |
+| Cloudflare Workers | 100,000 requests/day, 10 ms CPU per request, no card | API and app files; roughly 5,000 sessions a day |
+| Cloudflare Hyperdrive | 100,000 queries/day | A write is about 13 queries (transaction, row lock, idempotency, inserts), a read about 6: roughly 7,000 writes or 16,000 reads a day. The tighter of the two free limits, and the first thing to optimise (one SQL function per write) if it ever matters |
 | Neon Postgres | 0.5 GB storage (1 GB per recent reports), 100 compute-hours/month, sleeps after 5 idle minutes | The database: roughly 800,000 expenses |
 | GitHub Actions | Free for public repositories | CI, with Postgres as a service container |
 
@@ -299,7 +318,8 @@ Limits to know about:
 |---|---|---|
 | Ledger | Unit tests and property tests (fast-check): splits add up, postings balance, settle-up clears everything and matches brute force | Done |
 | Database | Integration tests against real Postgres 16: the zero-sum trigger, append-only triggers, row-level security, migrations, idempotency, optimistic edits, the change feed | Done (37 tests) |
-| API | Request-level tests: auth, membership checks, idempotency, 409 on stale edits | Phase 2 |
+| API | Real HTTP requests through every middleware against Postgres: sign-in (with stand-ins for GitHub and Google), cookies, cross-site refusal, validation, idempotency byte for byte, 409 on stale edits, outsiders get 404 | Done (20 tests) |
+| Workers runtime | `wrangler dev` (the real Workers runtime) against local Postgres through the Hyperdrive setting, driven by `scripts/smoke.ts` | Done locally; against production at deploy |
 | Concurrency | 50 simultaneous writes to one group; 20 copies of one request; 10 simultaneous edits; ordering under a held commit | Done at the database layer; repeated through the API in phase 4 |
 | Crashes | Kill the API process mid-write repeatedly, retry with the same keys; count duplicates and losses (target: 0 and 0) | Phase 4 |
 | Load | k6 against a local stack: requests/second and p95 latency at increasing load | Phase 4 |
@@ -318,7 +338,7 @@ Limits to know about:
 |---|---|---|
 | 0 | Design, ledger core | Done |
 | 1 | Database schema, migrations, write paths, integration tests | Done |
-| 2 | API: auth, groups, members, expenses, payments, settle-up, change feed | Deployed to Workers, talking to Neon |
+| 2 | API: auth, groups, members, invites, expenses, payments, settle-up, change feed | Built and tested; deploying is the last step (docs/DEPLOY.md) |
 | 3 | Web app: installable, offline outbox | Usable on a phone |
 | 4 | Concurrency, crash and load tests | Numbers published in the README |
 | 5 | Case study card on the portfolio | Live |
@@ -326,5 +346,7 @@ Limits to know about:
 ## 15. Open questions
 
 - Frontend framework: plain TypeScript like the portfolio, or a small framework (Svelte, Preact) for the forms.
-- Whether Cloudflare's rate limiting is usable on the free plan, or a per-user counter in Postgres is needed.
+- Rate limiting: not built yet. Whether Cloudflare's rate limiting is usable on the free plan, or a per-user
+  counter in Postgres is needed.
+- Leaving a group and removing a member (allowed only at a zero balance).
 - Placeholder members claiming their place: by invite link only, or also by matching email.

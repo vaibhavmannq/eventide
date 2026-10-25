@@ -1,0 +1,21 @@
+{
+  "name": "@eventide/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@eventide/db": "0.1.0",
+    "@eventide/ledger": "0.1.0",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261010.1",
+    "wrangler": "4.149.0"
+  }
+}

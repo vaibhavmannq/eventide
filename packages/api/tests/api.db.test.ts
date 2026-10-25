@@ -1,0 +1,378 @@
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTestDatabase, type TestDatabase } from '../../db/tests/harness.ts';
+import { app } from '../src/app.ts';
+import type { Config, OAuthProvider } from '../src/config.ts';
+
+/**
+ * The API end to end: real requests through every middleware, the ledger and the store, against Postgres.
+ * Only GitHub and Google are stood in for.
+ */
+const ORIGIN = 'https://eventide.test';
+let db: TestDatabase;
+const logs: Record<string, unknown>[] = [];
+
+const config = (overrides: Partial<Config> = {}): Config => ({
+  providers: {},
+  devLogin: true,
+  fetch: () => Promise.reject(new Error('no network in tests')),
+  log: (entry) => logs.push(entry),
+  ...overrides,
+});
+
+interface Call {
+  body?: unknown;
+  cookie?: string;
+  key?: string;
+  origin?: string | null;
+  config?: Config;
+}
+
+async function call(method: string, path: string, options: Call = {}) {
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (options.cookie) headers.Cookie = options.cookie;
+  if (options.key) headers['Idempotency-Key'] = options.key;
+  if (options.origin !== null) headers.Origin = options.origin ?? ORIGIN;
+  const response = await app.request(
+    `${ORIGIN}/api${path}`,
+    { method, headers, body: options.body === undefined ? null : JSON.stringify(options.body) },
+    { db: db.app, config: options.config ?? config() },
+  );
+  const text = await response.text();
+  // biome-ignore lint/suspicious/noExplicitAny: test responses are inspected loosely
+  const json: any = text ? JSON.parse(text) : null;
+  return { status: response.status, json, text, headers: response.headers };
+}
+
+/** Signs in through the development login and returns the session cookie to send back. */
+async function signIn(email: string, name: string): Promise<string> {
+  const response = await call('POST', '/auth/dev', { body: { email, name } });
+  expect(response.status).toBe(200);
+  return cookieFrom(response.headers);
+}
+
+function cookieFrom(headers: Headers, name = '__Host-session'): string {
+  const cookie = headers.getSetCookie().find((c) => c.startsWith(`${name}=`));
+  if (!cookie) throw new Error(`No ${name} cookie`);
+  return cookie.split(';')[0] ?? '';
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+});
+afterAll(() => db.close());
+
+describe('the basics', () => {
+  it('answers health checks without signing in', async () => {
+    expect(await call('GET', '/health')).toMatchObject({ status: 200, json: { ok: true } });
+  });
+
+  it('asks for sign-in, in the standard error shape', async () => {
+    expect(await call('GET', '/me')).toMatchObject({
+      status: 401,
+      json: { error: { code: 'UNAUTHENTICATED', message: 'Sign in first' } },
+    });
+  });
+
+  it('sets a session cookie that only HTTPS, this host and no script can use', async () => {
+    const response = await call('POST', '/auth/dev', { body: { email: 'cookie@example.com', name: 'C' } });
+    const cookie = response.headers.getSetCookie().find((c) => c.startsWith('__Host-session=')) ?? '';
+    expect(cookie).toMatch(/; Path=\//);
+    expect(cookie).toMatch(/; HttpOnly/);
+    expect(cookie).toMatch(/; Secure/);
+    expect(cookie).toMatch(/; SameSite=Lax/);
+    expect(cookie).not.toMatch(/Domain=/);
+  });
+
+  it('turns the development login off unless it is configured on', async () => {
+    const off = await call('POST', '/auth/dev', {
+      body: { email: 'x@example.com', name: 'X' },
+      config: config({ devLogin: false }),
+    });
+    expect(off.status).toBe(404);
+  });
+
+  it('refuses changes from another site, or with no Origin', async () => {
+    const cookie = await signIn('csrf@example.com', 'C');
+    const body = { name: 'G', currency: 'GBP', displayName: 'C' };
+    expect((await call('POST', '/groups', { body, cookie, origin: 'https://evil.example' })).status).toBe(403);
+    expect((await call('POST', '/groups', { body, cookie, origin: null })).json.error.code).toBe('BAD_ORIGIN');
+    expect((await call('POST', '/groups', { body, cookie })).status).toBe(201);
+  });
+
+  it('signs out, and the old cookie stops working', async () => {
+    const cookie = await signIn('leaver@example.com', 'L');
+    expect((await call('GET', '/me', { cookie })).status).toBe(200);
+    expect((await call('POST', '/auth/logout', { cookie })).status).toBe(204);
+    expect((await call('GET', '/me', { cookie })).status).toBe(401);
+  });
+
+  it('hides internal errors, and logs them', async () => {
+    const cookie = await signIn('boom@example.com', 'B');
+    const broken = { connect: () => Promise.reject(new Error('database is on fire')) };
+    const failing = await app.request(
+      `${ORIGIN}/api/groups`,
+      { headers: { Cookie: cookie } },
+      { db: broken, config: config() },
+    );
+    expect(failing.status).toBe(500);
+    expect(await failing.json()).toEqual({ error: { code: 'INTERNAL', message: 'Something went wrong on our side' } });
+    expect(logs.some((entry) => String(entry.error).includes('database is on fire'))).toBe(true);
+  });
+});
+
+describe('a flat sharing costs', () => {
+  let alice: string;
+  let bob: string;
+  let groupId: string;
+  const member = { alice: '', bob: '', sam: '' };
+
+  beforeAll(async () => {
+    alice = await signIn('alice@example.com', 'Alice');
+    bob = await signIn('bob@example.com', 'Bob');
+  });
+
+  it('creates a group, adds Sam by name, and invites Bob', async () => {
+    const created = await call('POST', '/groups', {
+      cookie: alice,
+      body: { name: 'Flat 4', currency: 'GBP', displayName: 'Alice' },
+    });
+    expect(created.status).toBe(201);
+    groupId = created.json.group.id;
+    member.alice = created.json.group.members[0].id;
+
+    const sam = await call('POST', `/groups/${groupId}/members`, { cookie: alice, body: { displayName: 'Sam' } });
+    member.sam = sam.json.member.id;
+
+    const invite = await call('POST', `/groups/${groupId}/invites`, { cookie: alice });
+    expect(invite.json.invite.url).toMatch(new RegExp(`^${ORIGIN}/join/`));
+    const token = invite.json.invite.token;
+
+    const preview = await call('GET', `/invites/${token}`, { cookie: bob });
+    expect(preview.json.invite).toMatchObject({ groupName: 'Flat 4', unclaimed: [{ displayName: 'Sam' }] });
+
+    expect(
+      (await call('POST', `/invites/${token}/accept`, { cookie: bob, body: { displayName: 'Bob' } })).json,
+    ).toEqual({ groupId });
+    const group = await call('GET', `/groups/${groupId}`, { cookie: bob });
+    member.bob = group.json.group.members.find((m: { displayName: string }) => m.displayName === 'Bob').id;
+    expect((await call('GET', '/groups', { cookie: bob })).json.groups).toHaveLength(1);
+  });
+
+  it('records an expense once, however many times it is sent', async () => {
+    const key = randomUUID();
+    const body = {
+      id: randomUUID(),
+      description: 'Groceries',
+      occurredOn: '2026-10-25',
+      transaction: {
+        kind: 'expense',
+        currency: 'GBP',
+        total: 9000,
+        paidBy: [{ member: member.alice, amount: 9000 }],
+        split: { kind: 'equal', members: [member.alice, member.bob, member.sam] },
+      },
+    };
+    const first = await call('POST', `/groups/${groupId}/transactions`, { cookie: alice, key, body });
+    const again = await call('POST', `/groups/${groupId}/transactions`, { cookie: alice, key, body });
+    expect(first.status).toBe(201);
+    expect(again.text).toBe(first.text); // byte for byte, not just the same data
+
+    const balances = await call('GET', `/groups/${groupId}/balances`, { cookie: bob });
+    expect(balances.json.currencies.GBP.balances).toEqual({
+      [member.alice]: 6000,
+      [member.bob]: -3000,
+      [member.sam]: -3000,
+    });
+    expect(balances.json.currencies.GBP.settleUp).toHaveLength(2);
+  });
+
+  it('settles up with the suggested payments, and everyone is even', async () => {
+    const { json } = await call('GET', `/groups/${groupId}/balances`, { cookie: bob });
+    for (const { from, to, amount } of json.currencies.GBP.settleUp) {
+      const paid = await call('POST', `/groups/${groupId}/transactions`, {
+        cookie: bob,
+        key: randomUUID(),
+        body: {
+          id: randomUUID(),
+          occurredOn: '2026-10-26',
+          transaction: { kind: 'settlement', currency: 'GBP', from, to, amount },
+        },
+      });
+      expect(paid.status).toBe(201);
+    }
+    expect((await call('GET', `/groups/${groupId}/balances`, { cookie: alice })).json).toEqual({ currencies: {} });
+  });
+
+  it('refuses an edit of a stale version with 409 and the current version', async () => {
+    const created = await call('POST', `/groups/${groupId}/transactions`, {
+      cookie: alice,
+      key: randomUUID(),
+      body: {
+        id: randomUUID(),
+        description: 'Pizza',
+        occurredOn: '2026-10-27',
+        transaction: {
+          kind: 'expense',
+          currency: 'GBP',
+          total: 3000,
+          paidBy: [{ member: member.bob, amount: 3000 }],
+          split: { kind: 'equal', members: [member.alice, member.bob] },
+        },
+      },
+    });
+    const t = created.json.transaction;
+    const edit = (cookie: string, total: number) =>
+      call('PUT', `/groups/${groupId}/transactions/${t.id}`, {
+        cookie,
+        key: randomUUID(),
+        body: {
+          expectedRevision: 1,
+          description: 'Pizza',
+          occurredOn: '2026-10-27',
+          transaction: { ...t.transaction, total, paidBy: [{ member: member.bob, amount: total }] },
+        },
+      });
+    expect((await edit(alice, 3200)).status).toBe(200);
+    const stale = await edit(bob, 2800);
+    expect(stale.status).toBe(409);
+    expect(stale.json.error).toMatchObject({ code: 'CONFLICT', details: { revision: 2, id: t.id } });
+
+    const deleted = await call('DELETE', `/groups/${groupId}/transactions/${t.id}?revision=2`, {
+      cookie: bob,
+      key: randomUUID(),
+    });
+    expect(deleted.json.transaction).toMatchObject({ deleted: true, revision: 3 });
+    expect((await call('GET', `/groups/${groupId}/balances`, { cookie: alice })).json).toEqual({ currencies: {} });
+  });
+
+  it('serves the change feed in order, from any point', async () => {
+    const all = await call('GET', `/groups/${groupId}/changes`, { cookie: bob });
+    const kinds = all.json.changes.map((c: { kind: string }) => c.kind);
+    expect(kinds).toEqual(['create', 'create', 'create', 'create', 'edit', 'delete']);
+    const rest = await call('GET', `/groups/${groupId}/changes?after=4`, { cookie: bob });
+    expect(rest.json.changes.map((c: { seq: number }) => c.seq)).toEqual([5, 6]);
+    expect(rest.json.lastSeq).toBe(6);
+  });
+
+  it('explains what is wrong with a bad request', async () => {
+    const post = (body: unknown, key: string | null = randomUUID()) =>
+      call('POST', `/groups/${groupId}/transactions`, key ? { cookie: alice, key, body } : { cookie: alice, body });
+    const valid = {
+      id: randomUUID(),
+      occurredOn: '2026-10-25',
+      transaction: {
+        kind: 'expense',
+        currency: 'GBP',
+        total: 100,
+        paidBy: [{ member: member.alice, amount: 100 }],
+        split: { kind: 'equal', members: [member.alice] },
+      },
+    };
+
+    expect((await post(valid, null)).json.error.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+
+    const shape = await post({ ...valid, occurredOn: 'yesterday', extra: 1 });
+    expect(shape.status).toBe(400);
+    expect(shape.json.error.code).toBe('INVALID_REQUEST');
+    expect(shape.json.error.details.map((d: { path: string }) => d.path)).toEqual(
+      expect.arrayContaining(['occurredOn']),
+    );
+
+    const money = await post({ ...valid, transaction: { ...valid.transaction, total: 101 } });
+    expect(money).toMatchObject({ status: 422, json: { error: { code: 'PAYERS_MISMATCH' } } });
+
+    const stranger = await post({
+      ...valid,
+      transaction: { ...valid.transaction, split: { kind: 'equal', members: [randomUUID()] } },
+    });
+    expect(stranger).toMatchObject({ status: 422, json: { error: { code: 'UNKNOWN_MEMBER' } } });
+  });
+
+  it('shows outsiders nothing, not even whether the group exists', async () => {
+    const mallory = await signIn('mallory@example.com', 'Mallory');
+    for (const path of [`/groups/${groupId}`, `/groups/${groupId}/balances`, `/groups/${groupId}/changes`]) {
+      expect((await call('GET', path, { cookie: mallory })).status, path).toBe(404);
+    }
+    expect((await call('GET', `/groups/${randomUUID()}`, { cookie: mallory })).status).toBe(404);
+    expect((await call('GET', '/groups/not-a-uuid', { cookie: mallory })).status).toBe(400);
+  });
+});
+
+describe('sign in with a provider', () => {
+  /** A stand-in for GitHub: hands out a token for the code "good", and a profile for that token. */
+  const fake = (email: { address: string; verified: boolean } | null): OAuthProvider => ({
+    clientId: 'client',
+    clientSecret: 'secret',
+    authorizeUrl: 'https://provider.test/authorize',
+    tokenUrl: 'https://provider.test/token',
+    scope: 'email',
+    profile: async (token) =>
+      token === 'access-token' && email?.verified ? { email: email.address, name: 'Grace' } : null,
+  });
+  const providerFetch: typeof fetch = async (input, init) => {
+    const body = new URLSearchParams(String(init?.body));
+    const ok =
+      String(input) === 'https://provider.test/token' && body.get('code') === 'good' && body.get('code_verifier');
+    return Response.json(ok ? { access_token: 'access-token' } : { error: 'bad_verification_code' });
+  };
+  const withProvider = (email: { address: string; verified: boolean } | null) =>
+    config({ devLogin: false, providers: { github: fake(email) }, fetch: providerFetch });
+
+  async function start(cfg: Config, next = '/groups') {
+    const response = await call('GET', `/auth/github?next=${encodeURIComponent(next)}`, { config: cfg });
+    const location = new URL(response.headers.get('Location') ?? '');
+    return { response, location, cookie: cookieFrom(response.headers, '__Host-oauth') };
+  }
+
+  it('sends the browser to the provider with a state and a PKCE challenge', async () => {
+    const { response, location } = await start(withProvider(null));
+    expect(response.status).toBe(302);
+    expect(location.origin + location.pathname).toBe('https://provider.test/authorize');
+    expect(location.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/api/auth/github/callback`);
+    expect(location.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(location.searchParams.get('state')).toBeTruthy();
+  });
+
+  it('signs in with a verified email and returns to where the person was going', async () => {
+    const cfg = withProvider({ address: 'Grace@Example.com', verified: true });
+    const { location, cookie } = await start(cfg, '/groups/abc');
+    const state = location.searchParams.get('state');
+    const callback = await call('GET', `/auth/github/callback?code=good&state=${state}`, { cookie, config: cfg });
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get('Location')).toBe('/groups/abc');
+    const me = await call('GET', '/me', { cookie: cookieFrom(callback.headers) });
+    expect(me.json.user).toMatchObject({ email: 'grace@example.com', name: 'Grace' });
+  });
+
+  it('refuses a callback whose state does not match this browser', async () => {
+    const cfg = withProvider({ address: 'grace@example.com', verified: true });
+    const { cookie } = await start(cfg);
+    const callback = await call('GET', '/auth/github/callback?code=good&state=forged', { cookie, config: cfg });
+    expect(callback.headers.get('Location')).toBe('/?signin=failed');
+    expect(callback.headers.getSetCookie().some((c) => c.startsWith('__Host-session='))).toBe(false);
+  });
+
+  it('refuses an unverified email', async () => {
+    const cfg = withProvider({ address: 'eve@example.com', verified: false });
+    const { location, cookie } = await start(cfg);
+    const state = location.searchParams.get('state');
+    const callback = await call('GET', `/auth/github/callback?code=good&state=${state}`, { cookie, config: cfg });
+    expect(callback.headers.get('Location')).toBe('/?signin=failed');
+  });
+
+  it('never redirects off-site after signing in', async () => {
+    const cfg = withProvider({ address: 'grace@example.com', verified: true });
+    for (const next of ['//evil.example', 'https://evil.example', '/\\evil.example']) {
+      const { location, cookie } = await start(cfg, next);
+      const state = location.searchParams.get('state');
+      const callback = await call('GET', `/auth/github/callback?code=good&state=${state}`, { cookie, config: cfg });
+      expect(callback.headers.get('Location'), next).toBe('/');
+    }
+  });
+
+  it('says so when a provider is not set up', async () => {
+    expect((await call('GET', '/auth/google', { config: withProvider(null) })).status).toBe(404);
+  });
+});

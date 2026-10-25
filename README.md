@@ -6,8 +6,9 @@ Eventide is a portfolio project about getting an ordinary thing exactly right: m
 penny, many people editing one group at once, phones that go offline, and every reliability claim backed by a
 test or a measurement. It runs entirely on free tiers.
 
-**Status:** phases 0 and 1 of 5 are done: the ledger core, and the Postgres database with its write paths. The API
-and app are next.
+**Status:** phases 0–2 of 5 are built and tested: the ledger core, the Postgres database, and the API (sign-in,
+groups, invites, expenses, settle-up). Deploying it is the next step ([docs/DEPLOY.md](docs/DEPLOY.md)); the app
+comes after.
 See the [design](docs/DESIGN.md) for the whole plan.
 
 ## What's here
@@ -19,6 +20,8 @@ See the [design](docs/DESIGN.md) for the whole plan.
 | [`docs/DATABASE.md`](docs/DATABASE.md) | Roles, migrations, and the rules Postgres enforces on its own |
 | [`packages/ledger`](packages/ledger/src) | The money rules as pure TypeScript: splitting, double-entry postings, balances, settle-up |
 | [`packages/db`](packages/db) | Schema, migrations, and every read and write, each in one transaction |
+| [`packages/api`](packages/api) | The HTTP API (Hono) and the Cloudflare Worker that serves it and the app |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Putting it online on free tiers, step by step |
 | [`scripts/bench-settle.ts`](scripts/bench-settle.ts) | The benchmark that sets how far settle-up searches exactly |
 
 ## The ledger in brief
@@ -44,6 +47,15 @@ settle-up.
   numbered with no gaps; a request sent 20 times at once is applied once; of 10 simultaneous edits, exactly one
   wins.
 
+## The API in brief
+
+- Sign in with GitHub or Google (OAuth with PKCE); the session is a `__Host-` cookie stored only as a hash.
+- One Cloudflare Worker serves the API and the app from the same origin, so cookies are first-party and there
+  is no CORS.
+- Every request is validated against a strict schema, errors have one shape, and changes to money need an
+  `Idempotency-Key`. A retry gets back the same bytes.
+- Tested with real HTTP requests against Postgres, and on the real Workers runtime with `wrangler dev`.
+
 ## Running it
 
 Needs Node 22 or later.
@@ -53,6 +65,11 @@ npm install
 npm test            # unit and property tests
 npm run typecheck
 npm run check       # Biome lint and format
-npm run test:db     # integration tests against Postgres (see docs/DATABASE.md)
+npm run test:db     # integration and API tests against Postgres (see docs/DATABASE.md)
+
+# The Worker locally (real Workers runtime), against a local Postgres:
+cp packages/api/.dev.vars.example packages/api/.dev.vars
+npm run dev -w @eventide/api
+node --experimental-strip-types scripts/smoke.ts http://localhost:8787
 node --experimental-strip-types scripts/bench-settle.ts
 ```

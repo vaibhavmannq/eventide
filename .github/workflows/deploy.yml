@@ -1,0 +1,59 @@
+name: Deploy
+
+# Runs only when started by hand (Actions → Deploy → Run workflow), so nothing reaches production by accident.
+# Needs these repository secrets (docs/DEPLOY.md):
+#   NEON_OWNER_URL         Neon connection string for the owner role, for migrations only
+#   CLOUDFLARE_API_TOKEN   a token from the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID
+on:
+  workflow_dispatch:
+    inputs:
+      only_migrate:
+        description: Only migrate the database (the first run, before Hyperdrive exists)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Check, type-check and test
+        run: npm run check && npm run typecheck && npm test
+
+      - name: Migrate the database
+        env:
+          DATABASE_URL: ${{ secrets.NEON_OWNER_URL }}
+        run: npm run db:migrate
+
+      - name: Deploy the Worker
+        if: ${{ !inputs.only_migrate }}
+        working-directory: packages/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Health check
+        # EVENTIDE_URL is a repository variable (not a secret), e.g. https://eventide.<you>.workers.dev
+        if: ${{ !inputs.only_migrate && vars.EVENTIDE_URL != '' }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 "${{ vars.EVENTIDE_URL }}/api/health"

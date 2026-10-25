@@ -1,0 +1,69 @@
+/**
+ * The Cloudflare Worker. Requests under /api reach the API; every other path is served from the app's files
+ * (wrangler.jsonc, `assets`), so the app and the API share one origin and the session cookie is first-party.
+ */
+import { nightly } from '@eventide/db';
+import pg from 'pg';
+import { app } from './app.ts';
+import { type Config, github, google } from './config.ts';
+
+interface Env {
+  /** Cloudflare Hyperdrive: pooled connections to Neon, kept warm near the database. */
+  HYPERDRIVE: { connectionString: string };
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  /** "true" only in .dev.vars for local development. Never set it in production. */
+  DEV_LOGIN?: string;
+}
+
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+function configFrom(env: Env): Config {
+  const providers: Config['providers'] = {};
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    providers.github = github(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET);
+  }
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    providers.google = google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+  }
+  return {
+    providers,
+    devLogin: env.DEV_LOGIN === 'true',
+    fetch: (input, init) => fetch(input, init),
+    log: (entry) => console.log(JSON.stringify(entry)),
+  };
+}
+
+/** A pool per request, as Hyperdrive recommends: Hyperdrive does the real pooling, and Workers share nothing. */
+function poolFor(env: Env) {
+  const pool = new pg.Pool({ connectionString: env.HYPERDRIVE.connectionString, max: 5 });
+  pool.on('error', (error) => console.error(JSON.stringify({ level: 'error', event: 'pool', error: String(error) })));
+  return pool;
+}
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const pool = poolFor(env);
+    try {
+      return await app.fetch(request, { db: pool, config: configFrom(env) }, ctx as never);
+    } finally {
+      ctx.waitUntil(pool.end());
+    }
+  },
+
+  /** Nightly (wrangler.jsonc, `triggers`): audit every ledger, purge expired sessions, invites and keys. */
+  async scheduled(_controller: unknown, env: Env, ctx: ExecutionContext): Promise<void> {
+    const pool = poolFor(env);
+    try {
+      const result = await nightly(pool);
+      const level = result.unbalanced.length > 0 ? 'error' : 'info';
+      console.log(JSON.stringify({ level, event: 'nightly', ...result }));
+    } finally {
+      ctx.waitUntil(pool.end());
+    }
+  },
+};

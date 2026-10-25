@@ -12,7 +12,7 @@
   "scripts": {
     "check": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "tsc --noEmit -p packages/ledger && tsc --noEmit -p packages/db && tsc --noEmit -p scripts",
+    "typecheck": "tsc --noEmit -p packages/ledger && tsc --noEmit -p packages/db && tsc --noEmit -p packages/api && tsc --noEmit -p scripts",
     "test": "vitest run",
     "test:db": "vitest run -c vitest.db.config.ts",
     "db:migrate": "node --experimental-strip-types --no-warnings packages/db/src/cli.ts"

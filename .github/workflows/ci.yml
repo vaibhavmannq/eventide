@@ -38,6 +38,10 @@ jobs:
       - name: Unit and property tests
         run: npm test
 
+      - name: Bundle the Worker (no deploy)
+        working-directory: packages/api
+        run: npx wrangler deploy --dry-run --outdir dist
+
   database:
     runs-on: ubuntu-latest
     services:
