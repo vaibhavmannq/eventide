@@ -22,9 +22,9 @@
     "crash": "node --experimental-strip-types --no-warnings scripts/proof/crash.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.13",
-    "@playwright/test": "^1.63.0",
-    "@types/node": "24.13.4",
+    "@biomejs/biome": "2.5.15",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "24.19.2",
     "@types/pg": "^8.23.1",
     "fast-check": "4.10.2",
     "pg": "^8.23.1",
