@@ -10,7 +10,7 @@
   "dependencies": {
     "@eventide/ledger": "0.1.0",
     "@preact/signals": "2.11.3",
-    "preact": "10.29.8"
+    "preact": "11.0.1"
   },
   "devDependencies": {
     "@babel/core": "7.28.5",
