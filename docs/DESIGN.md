@@ -282,6 +282,30 @@ become visible at commit time, so a reader can see 12 and 14 before 13 commits, 
   and a 500 never includes internals; the log has them, under the request id.
 - **Data kept:** name, email, and what you enter. No analytics trackers.
 
+### 9.1 Signing in to the Windows app
+
+The Windows app (desktop/, Tauri) is the live site in a WebView2 window. Google refuses sign-in inside an app's own
+web view, and the browser's session cookie cannot be handed to the app, so:
+
+1. When the window starts to open `/api/auth/<provider>`, the app cancels it, makes a 32-byte secret (the
+   verifier) that it keeps in memory, and opens the same address in the browser with `handoff=` the verifier's
+   base64url SHA-256 (the challenge). The challenge rides in the OAuth `state` cookie.
+2. After the provider answers, the server signs no one in in the browser. It stores a one-time code (hashed,
+   two minutes, migration 0005) with the user and the challenge, and sends the browser to
+   `/desktop-return#code=…`, which opens `eventide://signin?code=…`. The code is in the fragment, which never
+   reaches a server or its logs.
+3. The app loads `/desktop#code=…&verifier=…` in its window, which posts both to `/api/auth/handoff`. The code is
+   deleted as it is read; only if the verifier hashes to the stored challenge does the window get a session
+   cookie of its own.
+
+Another program that registers `eventide://` and catches the code cannot use it: it lacks the verifier, and its
+attempt uses the code up. `/api/auth/handoff` only answers a user agent containing `EventideDesktop/`, so a link
+carrying someone's code and verifier cannot sign an ordinary browser in to their account. This is the same idea
+as PKCE (RFC 7636), applied to the step after the provider.
+
+The Android app needs none of this: it is a Trusted Web Activity, the site running in the phone's Chrome, so it
+shares Chrome's sign-in and cookies (docs/APPS.md).
+
 ## 10. Capacity and scaling
 
 Eventide will not have a million users; the point is to know where it would break. Back of the envelope for

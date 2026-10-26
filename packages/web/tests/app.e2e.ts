@@ -311,6 +311,36 @@ test('the privacy policy is readable without signing in, and linked from the sig
   await expect(page.getByRole('heading', { name: 'What Eventide keeps, and why' })).toBeVisible();
 });
 
+test('signing in for the Windows app: the browser hands the code over, and a bad code is refused', async ({
+  browser,
+}) => {
+  // In the browser: the page offers the app's link, and wipes the code from the address bar.
+  const page = await browser.newPage(test.info().project.use);
+  await page.goto('/desktop-return#code=abc', { waitUntil: 'commit' }); // the page then opens eventide://
+  await expect(page.getByRole('link', { name: /Open Eventide/ })).toHaveAttribute('href', 'eventide://signin?code=abc');
+  expect(new URL(page.url()).hash).toBe('');
+
+  // In the app (it names itself in its user agent): a code that was never issued signs no one in.
+  const appContext = await browser.newContext({
+    ...test.info().project.use,
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0) Edg/130.0 EventideDesktop/0.1.0',
+  });
+  const app = await appContext.newPage();
+  const token = 'A'.repeat(43);
+  await app.goto(`/desktop#code=${token}&verifier=${token}`);
+  await expect(app.getByRole('alert')).toContainText('expired or was already used');
+  await app.getByRole('link', { name: 'Sign in again' }).click();
+  await expect(app.getByRole('heading', { name: 'Eventide' })).toBeVisible();
+});
+
+test('the sign-in screen links to the Android and Windows downloads', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Android & Windows apps' })).toHaveAttribute(
+    'href',
+    'https://github.com/vaibhavmannq/eventide/releases/latest',
+  );
+});
+
 test('the pages carry a strict content security policy, and nothing in the app trips it', async ({ browser }) => {
   const context = await browser.newContext(test.info().project.use);
   const page = await context.newPage();

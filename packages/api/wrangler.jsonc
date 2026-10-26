@@ -10,7 +10,7 @@
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"],
+    "run_worker_first": ["/api/*", "/.well-known/assetlinks.json"],
     "not_found_handling": "single-page-application"
   },
 
@@ -34,6 +34,13 @@
     { "name": "RL_IP", "namespace_id": "1001", "simple": { "limit": 300, "period": 60 } },
     { "name": "RL_USER", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
   ],
+
+  // Anyone can make an account: the owner shares the app (and its Android and Windows downloads) with people they
+  // know (2026-10-26). Set to "closed" to go back to invite links and ALLOWED_EMAILS only (docs/DEPLOY.md).
+  //
+  // ANDROID_CERT_SHA256: the Android app's signing key fingerprint (docs/APPS.md), served at
+  // /.well-known/assetlinks.json so the app opens without an address bar. Public by design.
+  "vars": { "SIGNUPS": "open", "ANDROID_CERT_SHA256": "" },
 
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }

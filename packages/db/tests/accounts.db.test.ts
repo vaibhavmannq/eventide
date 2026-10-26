@@ -3,6 +3,7 @@ import {
   acceptInvite,
   addMember,
   createGroup,
+  createHandoff,
   createInvite,
   createSession,
   deleteSession,
@@ -10,6 +11,7 @@ import {
   listGroups,
   nightly,
   previewInvite,
+  takeHandoff,
   upsertUser,
   userForSession,
 } from '../src/index.ts';
@@ -105,13 +107,36 @@ describe('invites', () => {
   });
 });
 
+describe('desktop sign-in handoffs', () => {
+  it('can be used once, and stores only a hash of the code', async () => {
+    const code = await createHandoff(db.app, f.alice, 'the-challenge', '/groups');
+    const { rows } = await db.owner.query('select code_hash from sign_in_handoffs');
+    expect(Buffer.from(rows[0].code_hash).toString()).not.toContain(code);
+    expect(await takeHandoff(db.app, code)).toEqual({ userId: f.alice, challenge: 'the-challenge', next: '/groups' });
+    expect(await takeHandoff(db.app, code)).toBeNull();
+  });
+
+  it('is refused once expired, and is used up by trying', async () => {
+    const code = await createHandoff(db.app, f.alice, 'c', '/');
+    await db.owner.query("update sign_in_handoffs set expires_at = now() - interval '1 second'");
+    expect(await takeHandoff(db.app, code)).toBeNull();
+    expect((await db.owner.query('select 1 from sign_in_handoffs')).rowCount).toBe(0);
+    expect(await takeHandoff(db.app, 'never-issued')).toBeNull();
+  });
+});
+
 describe('the nightly job', () => {
   it('finds no unbalanced ledger, and purges what has expired', async () => {
     await createSession(db.app, f.alice);
     await createInvite(db.app, f.alice, f.groupId);
+    await createHandoff(db.app, f.alice, 'challenge', '/');
     await db.owner.query("update sessions set expires_at = now() - interval '1 second'");
     await db.owner.query("update invites set expires_at = now() - interval '1 second'");
-    expect(await nightly(db.app)).toEqual({ unbalanced: [], purged: { sessions: 1, invites: 1, idempotencyKeys: 0 } });
+    await db.owner.query("update sign_in_handoffs set expires_at = now() - interval '1 second'");
+    expect(await nightly(db.app)).toEqual({
+      unbalanced: [],
+      purged: { sessions: 1, invites: 1, idempotencyKeys: 0, handoffs: 1 },
+    });
   });
 
   it('reports a ledger that does not add up, across every group', async () => {

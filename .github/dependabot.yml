@@ -13,3 +13,15 @@ updates:
     directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }
+
+  - package-ecosystem: cargo
+    directory: /desktop/src-tauri
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
+    groups:
+      dependencies: { patterns: ['*'] }
+
+  - package-ecosystem: gradle
+    directory: /android
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }

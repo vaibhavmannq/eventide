@@ -1,9 +1,11 @@
 import {
+  createHandoff,
   createSession,
   deleteSession,
   inviteIsValid,
   newToken,
   sha256,
+  takeHandoff,
   type User,
   upsertUser,
   userExists,
@@ -13,7 +15,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Bindings, ProviderName } from './config.ts';
 import { HttpError } from './errors.ts';
-import { devLogin } from './schemas.ts';
+import { devLogin, handoffExchange } from './schemas.ts';
 
 export interface AppEnv {
   Bindings: Bindings;
@@ -44,7 +46,8 @@ const inviteIn = (path: string | undefined) => /^\/join\/([^/?#]+)/.exec(path ??
 
 export const tooMany = () => new HttpError(429, 'RATE_LIMITED', 'Too many requests. Try again in a minute.');
 
-async function signIn(
+/** Checks the person may have an account (invite-only, when sign-up is closed), and creates or updates it. */
+async function admit(
   c: Parameters<MiddlewareHandler<AppEnv>>[0],
   email: string,
   name: string,
@@ -57,11 +60,34 @@ async function signIn(
       throw new HttpError(403, 'INVITE_ONLY', 'Eventide is invite-only for now. Ask a friend for an invite link.');
     }
   }
-  const user = await upsertUser(c.env.db, email, name);
-  const { token, expiresAt } = await createSession(c.env.db, user.id);
+  return upsertUser(c.env.db, email, name);
+}
+
+async function startSession(c: Parameters<MiddlewareHandler<AppEnv>>[0], userId: string): Promise<void> {
+  const { token, expiresAt } = await createSession(c.env.db, userId);
   setCookie(c, SESSION, token, { ...secure, expires: expiresAt });
+}
+
+async function signIn(
+  c: Parameters<MiddlewareHandler<AppEnv>>[0],
+  email: string,
+  name: string,
+  invite?: string,
+): Promise<User> {
+  const user = await admit(c, email, name, invite);
+  await startSession(c, user.id);
   return user;
 }
+
+/**
+ * The Windows app names itself in its user agent. Only it can swap a handoff code, so a link that would sign an
+ * ordinary browser in to someone else's account (with a code and verifier of their own) does nothing.
+ */
+const fromDesktopApp = (c: Parameters<MiddlewareHandler<AppEnv>>[0]) =>
+  /\bEventideDesktop\//.test(c.req.header('User-Agent') ?? '');
+
+/** A PKCE-style challenge: base64url SHA-256, 43 characters. */
+const CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
 /** Only same-site paths, so a crafted link cannot send someone elsewhere after signing in. */
 function safeNext(next: string | undefined): string {
@@ -84,6 +110,8 @@ interface OAuthState {
   verifier: string;
   provider: ProviderName;
   next: string;
+  /** Set when the Windows app started this sign-in in the browser: its challenge, for the handoff code. */
+  handoff?: string;
 }
 
 export const auth = new Hono<AppEnv>()
@@ -106,11 +134,14 @@ export const auth = new Hono<AppEnv>()
     const provider = c.env.config.providers[name];
     if (!provider) throw new HttpError(404, 'NOT_FOUND', `Sign-in with ${name} is not set up`);
 
+    const handoff = c.req.query('handoff');
+    if (handoff !== undefined && !CHALLENGE.test(handoff)) throw new HttpError(400, 'BAD_REQUEST', 'Bad handoff');
     const flow: OAuthState = {
       state: newToken(),
       verifier: newToken(),
       provider: name,
       next: safeNext(c.req.query('next')),
+      ...(handoff ? { handoff } : {}),
     };
     setCookie(c, OAUTH, btoa(JSON.stringify(flow)), { ...secure, maxAge: 600 });
 
@@ -166,13 +197,34 @@ export const auth = new Hono<AppEnv>()
     const profile = await provider.profile(accessToken, c.env.config.fetch);
     if (!profile) return failed('no verified email');
 
+    let user: User;
     try {
-      await signIn(c, profile.email, profile.name, inviteIn(flow.next));
+      user = await admit(c, profile.email, profile.name, inviteIn(flow.next));
     } catch (error) {
       if (error instanceof HttpError && error.code === 'INVITE_ONLY') return c.redirect('/?signin=invite-only', 302);
       throw error;
     }
+    if (flow.handoff) {
+      // Started by the Windows app: this browser gets no session, the app gets a code for one. The code travels
+      // in the fragment, which never reaches a server or its logs.
+      const handoffCode = await createHandoff(c.env.db, user.id, flow.handoff, flow.next);
+      return c.redirect(`/desktop-return#code=${handoffCode}`, 302);
+    }
+    await startSession(c, user.id);
     return c.redirect(flow.next, 302);
+  })
+
+  /** The Windows app swaps a handoff code, and the verifier only it holds, for a session in its own web view. */
+  .post('/handoff', async (c) => {
+    if (!fromDesktopApp(c)) throw new HttpError(403, 'FORBIDDEN', 'Only the Eventide app can do this');
+    const { code, verifier } = handoffExchange.parse(await c.req.json());
+    const handoff = await takeHandoff(c.env.db, code);
+    if (!handoff || base64url(await sha256(verifier)) !== handoff.challenge) {
+      c.env.config.log({ event: 'handoff_refused', requestId: c.get('requestId') });
+      throw new HttpError(400, 'HANDOFF_INVALID', 'That sign-in has expired. Please sign in again.');
+    }
+    await startSession(c, handoff.userId);
+    return c.json({ next: handoff.next });
   })
 
   .post('/dev', async (c) => {
