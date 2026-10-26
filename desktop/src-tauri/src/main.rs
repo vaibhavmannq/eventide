@@ -1,4 +1,4 @@
-//! Eventide for Windows: the live web app in its own window, with one addition. Google refuses to sign anyone in
+//! Eventide for Windows and Linux: the live web app in its own window, with one addition. Google refuses to sign anyone in
 //! inside an app's own web view, so signing in happens in the person's browser and the session is handed back
 //! through an eventide:// link (docs/DESIGN.md §9.1):
 //!
@@ -27,9 +27,16 @@ const HOME: &str = match option_env!("EVENTIDE_URL") {
 };
 
 /** The server only swaps a handoff code for a session when the request names the app (packages/api/src/auth.ts). */
+#[cfg(windows)]
 const USER_AGENT: &str = concat!(
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 ",
     "Safari/537.36 Edg/130.0.0.0 EventideDesktop/",
+    env!("CARGO_PKG_VERSION")
+);
+#[cfg(not(windows))]
+const USER_AGENT: &str = concat!(
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 ",
+    "EventideDesktop/",
     env!("CARGO_PKG_VERSION")
 );
 

@@ -1,16 +1,20 @@
-# The Android and Windows apps
+# The Android, Windows and Linux apps
 
-Both are the live site in an app of its own, so every change ships with a normal Deploy; the apps only need a
-new release when the wrappers themselves change. iPhone and Mac: install from Safari (Share → Add to Home Screen,
-or File → Add to Dock); a store app needs Apple's paid developer account, which this project does not use.
+Each is the live site in an app of its own, so every change ships with a normal Deploy; the apps only need a
+new release when the wrappers themselves change. The site no longer offers a browser install (no web app
+manifest): the apps are the one way to install it. Apple's platforms are out of scope (they need a paid
+developer account); there the site works in Safari.
 
 | | What it is | Where |
 |---|---|---|
 | Android | A Trusted Web Activity: the site full screen in the phone's Chrome, with Chrome's sign-in and offline copy | `android/` |
 | Windows | Tauri: the site in a WebView2 window; signing in goes through the browser (DESIGN §9.1) | `desktop/` |
+| Linux | The same Tauri app, on WebKitGTK: a `.deb` and an AppImage | `desktop/` |
 
 Releases are built by `.github/workflows/apps.yml` and published on the repository's Releases page, which the
-sign-in screen links to. Pull requests that touch either app build both, unsigned, to check they still build.
+site links to. Pull requests that touch the apps build them all, unsigned, and open the Android app on an
+emulator (`.github/scripts/android-smoke.sh`): a crash on start fails the check, with the crash log as an
+annotation on the run.
 
 ## One-time setup: the Android signing key
 
@@ -47,3 +51,5 @@ the release `v0.1.0` has `Eventide-android.apk` and `Eventide-windows-setup.exe`
 - **Android:** open the APK on the phone; allow installing from the browser or files app when asked.
 - **Windows:** the installer is not signed with a paid certificate, so SmartScreen may warn: More info → Run anyway.
   It installs for the current user only (no administrator needed) and registers `eventide://` for signing in.
+- **Linux:** `sudo apt install ./Eventide-linux-amd64.deb` on Ubuntu, Debian or Mint (it uses the system's
+  WebKitGTK, so it is small). Elsewhere, `chmod +x Eventide-linux-x86_64.AppImage` and run it (it carries its own).

@@ -176,7 +176,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.version.outputs.version }}
-        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --config "{\"version\":\"$VERSION\"}"
+        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --bundles nsis --config "{\"version\":\"$VERSION\"}"
 
       - name: Name the installer
         shell: bash
@@ -189,9 +189,56 @@ jobs:
           path: Eventide-windows-setup.exe
           if-no-files-found: error
 
+  linux:
+    needs: version
+    # The oldest supported Ubuntu, so the .deb and AppImage run on as many distributions as possible.
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the libraries Tauri builds against
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Test the app's own code
+        working-directory: desktop/src-tauri
+        run: cargo test --locked
+
+      - name: Build the .deb and the AppImage
+        working-directory: desktop
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --bundles deb,appimage --config "{\"version\":\"$VERSION\"}"
+
+      - name: Name them
+        run: |
+          cp desktop/src-tauri/target/release/bundle/deb/*.deb Eventide-linux-amd64.deb
+          cp desktop/src-tauri/target/release/bundle/appimage/*.AppImage Eventide-linux-x86_64.AppImage
+
+      - name: Keep them
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: Eventide-linux-*
+          if-no-files-found: error
+
   release:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [version, android, windows]
+    needs: [version, android, android-on-a-phone, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -215,7 +262,10 @@ jobs:
           Windows SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**. Signing in opens
           your browser once, then returns you to the app.
 
-          Nothing to install? Eventide also works in any browser: open the site and choose Install.
+          **Linux:** `Eventide-linux-amd64.deb` for Ubuntu, Debian and Mint (`sudo apt install ./Eventide-linux-amd64.deb`),
+          or `Eventide-linux-x86_64.AppImage` for any other distribution (`chmod +x` it, then run it).
+
+          Nothing to install? Eventide also works in any browser.
           NOTES
           gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Eventide $VERSION" --notes-file notes.md

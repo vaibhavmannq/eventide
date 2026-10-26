@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Eventide
+Comment=Split costs, settle up, rest.
+Exec={{exec}} %u
+Icon={{icon}}
+Terminal=false
+Categories=Office;Finance;
+StartupWMClass={{exec}}
+MimeType=x-scheme-handler/eventide;
