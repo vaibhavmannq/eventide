@@ -28,17 +28,35 @@ fi
 # The site, inside the app's own window: ask the page itself (DevTools, which debug builds allow) what it shows.
 pid=$(adb shell pidof io.github.vaibhavmannq.eventide | tr -d '\r')
 adb forward tcp:9222 "localabstract:webview_devtools_remote_$pid" >/dev/null
-page=$(node -e '
-  (async () => {
-    const [target] = await (await fetch("http://127.0.0.1:9222/json")).json();
-    const ws = new WebSocket(target.webSocketDebuggerUrl);
-    await new Promise((ok) => (ws.onopen = ok));
-    ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: "location.href + \"\\n\" + document.body.innerText" } }));
-    ws.onmessage = (m) => { console.log(JSON.parse(m.data).result.result.value); ws.close(); };
-  })().catch((e) => console.log("DevTools unreachable: " + e));
-')
+cdp() { # sends one DevTools command to the page (method, JSON params) and prints its result
+  node -e '
+    (async () => {
+      const [target] = await (await fetch("http://127.0.0.1:9222/json")).json();
+      const ws = new WebSocket(target.webSocketDebuggerUrl);
+      await new Promise((ok) => (ws.onopen = ok));
+      ws.send(JSON.stringify({ id: 1, method: process.argv[1], params: JSON.parse(process.argv[2]) }));
+      ws.onmessage = (m) => { const r = JSON.parse(m.data).result; console.log(r?.result?.value ?? ""); ws.close(); };
+    })().catch((e) => console.log("DevTools unreachable: " + e));
+  ' "$1" "$2"
+}
+# A freshly booted emulator can take a while to get its network: reload the page before judging it.
+for attempt in 1 2 3 4 5; do
+  page=$(cdp Runtime.evaluate '{"expression":"location.href + \"\\n\" + document.body.innerText"}')
+  printf '%s' "$page" | grep -q "Sign in with" && break
+  cdp Page.navigate '{"url":"https://eventide.vaibhavmann-10.workers.dev/"}' >/dev/null
+  sleep 15
+done
 if ! printf '%s' "$page" | grep -q "Sign in with"; then
   annotate error "The app is open but the site is not showing" "$page"
   exit 1
 fi
 annotate notice "Showing the site" "$(printf '%s' "$page" | head -8)"
+
+# The page starts below the status bar: the WebView's top edge (left,top-right,bottom in its frame) is not 0.
+view=$(adb shell dumpsys activity top | grep -m1 "android.webkit.WebView{")
+top_edge=$(printf '%s' "$view" | grep -oE '[0-9]+,[0-9]+-[0-9]+,[0-9]+' | head -1 | cut -d, -f2 | cut -d- -f1)
+annotate notice "WebView bounds" "$view"
+if [ "${top_edge:-0}" -le 0 ]; then
+  annotate error "The page runs under the status bar" "$view"
+  exit 1
+fi

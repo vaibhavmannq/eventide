@@ -16,6 +16,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.window.OnBackInvokedDispatcher;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,8 +46,12 @@ public class MainActivity extends Activity {
 
         web = new WebView(this);
         web.setBackgroundColor(getColor(R.color.night));
-        setContentView(web);
-        keepClearOfSystemBars();
+        // The page sits in a frame padded by the system bars: a WebView draws under its own padding.
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackgroundColor(getColor(R.color.night));
+        frame.addView(web);
+        setContentView(frame);
+        keepClearOfSystemBars(frame);
 
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -129,11 +134,12 @@ public class MainActivity extends Activity {
     }
 
     /** Android 15 and later draw apps edge to edge: keep the page out from under the status bar and keyboard. */
-    private void keepClearOfSystemBars() {
-        web.setOnApplyWindowInsetsListener((view, insets) -> {
+    private void keepClearOfSystemBars(FrameLayout frame) {
+        frame.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime());
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return WindowInsets.CONSUMED; // handled here; the page must not pad again
             }
             return insets;
         });

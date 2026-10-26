@@ -141,7 +141,7 @@ jobs:
       - name: Open it on an emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 34
+          api-level: 35 # draws apps edge to edge, as phones do now
           target: google_apis_playstore
           arch: x86_64
           script: .github/scripts/android-smoke.sh
