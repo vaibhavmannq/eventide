@@ -15,8 +15,6 @@ adb exec-out screencap -p > android-screen.png
 top=$(adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | head -3)
 annotate notice "In front after 30 s" "$top"
 annotate notice "Page console" "$(grep -E 'chromium.*CONSOLE|cr_.*(Error|error)' logcat.txt | tail -20)."
-adb shell uiautomator dump /sdcard/screen.xml >/dev/null 2>&1
-screen=$(adb exec-out cat /sdcard/screen.xml)
 
 crash=$(grep -A 30 "FATAL EXCEPTION" logcat.txt | head -45)
 if [ -n "$crash" ]; then
@@ -27,9 +25,20 @@ if ! printf '%s' "$top" | grep -q "io.github.vaibhavmannq.eventide"; then
   annotate error "The app is not in front" "$top"
   exit 1
 fi
-# The site, inside the app's own window: its sign-in buttons are on the screen.
-if ! printf '%s' "$screen" | grep -q "Sign in with"; then
-  annotate error "The app is open but the site is not showing" "Text on screen: $(printf '%s' "$screen" | grep -oE '(text|content-desc)="[^"]+"' | head -30 | tr '\n' ' ') (screen dump: ${#screen} bytes)"
+# The site, inside the app's own window: ask the page itself (DevTools, which debug builds allow) what it shows.
+pid=$(adb shell pidof io.github.vaibhavmannq.eventide | tr -d '\r')
+adb forward tcp:9222 "localabstract:webview_devtools_remote_$pid" >/dev/null
+page=$(node -e '
+  (async () => {
+    const [target] = await (await fetch("http://127.0.0.1:9222/json")).json();
+    const ws = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((ok) => (ws.onopen = ok));
+    ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: "location.href + \"\\n\" + document.body.innerText" } }));
+    ws.onmessage = (m) => { console.log(JSON.parse(m.data).result.result.value); ws.close(); };
+  })().catch((e) => console.log("DevTools unreachable: " + e));
+')
+if ! printf '%s' "$page" | grep -q "Sign in with"; then
+  annotate error "The app is open but the site is not showing" "$page"
   exit 1
 fi
-annotate notice "Showing the site" "$(printf '%s' "$screen" | grep -oE 'text="[^"]+"' | head -8)"
+annotate notice "Showing the site" "$(printf '%s' "$page" | head -8)"

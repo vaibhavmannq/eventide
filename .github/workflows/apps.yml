@@ -126,6 +126,12 @@ jobs:
         working-directory: android
         run: gradle assembleDebug --no-daemon
 
+      - name: Set up Node from .nvmrc
+        # The emulator test reads the page through DevTools with Node's built-in WebSocket.
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
       - name: Let the emulator use hardware acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
