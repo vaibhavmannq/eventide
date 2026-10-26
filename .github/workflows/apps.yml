@@ -1,0 +1,163 @@
+name: Apps
+
+# The Android APK and the Windows installer (docs/APPS.md).
+# - On a pull request that touches them: build both, to show they still build. Nothing is signed or published.
+# - Run by hand on main (Actions → Apps → Run workflow, with a version like 0.1.0): build signed copies and
+#   publish them as a GitHub release, which the sign-in screen links to (releases/latest).
+# Needs these repository secrets for a release: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD.
+on:
+  pull_request:
+    paths: ['android/**', 'desktop/**', '.github/workflows/apps.yml']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, like 0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  RELEASING: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - id: check
+        env:
+          VERSION: ${{ inputs.version || '0.0.0' }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The version must look like 1.2.3, not '$VERSION'"; exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$RELEASING" != true ]; then
+            echo "::error::Releases are made from main only"; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Write the signing key to a file
+        if: env.RELEASING == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then echo "::error::Add the ANDROID_KEYSTORE_BASE64 secret (docs/APPS.md)"; exit 1; fi
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/eventide.keystore"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/eventide.keystore" >> "$GITHUB_ENV"
+
+      - name: Build the APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gradle assembleRelease --no-daemon "-PversionName=$VERSION" "-PversionCode=$GITHUB_RUN_NUMBER"
+
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/eventide.keystore"
+
+      - name: Name the APK
+        run: |
+          ls android/app/build/outputs/apk/release/
+          if [ "$RELEASING" = true ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk Eventide-android.apk
+          else
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk Eventide-android-unsigned.apk
+          fi
+
+      - name: Keep it
+        uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: Eventide-android*.apk
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Test the app's own code
+        working-directory: desktop/src-tauri
+        run: cargo test --locked
+
+      - name: Build the installer
+        working-directory: desktop
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --config "{\"version\":\"$VERSION\"}"
+
+      - name: Name the installer
+        shell: bash
+        run: cp desktop/src-tauri/target/release/bundle/nsis/*-setup.exe Eventide-windows-setup.exe
+
+      - name: Keep it
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: Eventide-windows-setup.exe
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: [version, android, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Collect the builds
+        uses: actions/download-artifact@v8
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cat > notes.md <<'NOTES'
+          **Android:** download `Eventide-android.apk` on your phone and open it. Android asks once to allow installing
+          apps from your browser or files app; allow it. Updates install over the top.
+
+          **Windows:** download `Eventide-windows-setup.exe` and run it. It is not signed with a paid certificate, so
+          Windows SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**. Signing in opens
+          your browser once, then returns you to the app.
+
+          Nothing to install? Eventide also works in any browser: open the site and choose Install.
+          NOTES
+          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Eventide $VERSION" --notes-file notes.md
