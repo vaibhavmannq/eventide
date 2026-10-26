@@ -5,6 +5,7 @@ import { newToken, one, sha256 } from './util.ts';
 
 export const SESSION_DAYS = 30;
 export const INVITE_DAYS = 7;
+export const HANDOFF_SECONDS = 120;
 
 export interface Group {
   id: string;
@@ -153,6 +154,44 @@ export async function acceptInvite(
   });
 }
 
+/**
+ * A one-time code that a desktop app swaps for a session (migration 0005). `challenge` is the base64url SHA-256 of
+ * the secret only the app holds; checking it is the caller's job, since it needs the verifier.
+ */
+export async function createHandoff(pool: Pool, userId: string, challenge: string, next: string): Promise<string> {
+  const code = newToken();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `insert into sign_in_handoffs (code_hash, user_id, challenge, next, expires_at)
+       values ($1, $2, $3, $4, now() + make_interval(secs => $5))`,
+      [await sha256(code), userId, challenge, next, HANDOFF_SECONDS],
+    );
+  } finally {
+    client.release();
+  }
+  return code;
+}
+
+/** Uses up a handoff code: it is deleted whether or not the verifier that comes with it turns out to be right. */
+export async function takeHandoff(
+  pool: Pool,
+  code: string,
+): Promise<{ userId: string; challenge: string; next: string } | null> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query<{ user_id: string; challenge: string; next: string; live: boolean }>(
+      `delete from sign_in_handoffs where code_hash = $1
+       returning user_id, challenge, next, expires_at > now() as live`,
+      [await sha256(code)],
+    );
+    const row = rows[0];
+    return row?.live ? { userId: row.user_id, challenge: row.challenge, next: row.next } : null;
+  } finally {
+    client.release();
+  }
+}
+
 /** The nightly checks: any group whose ledger does not add up (must be none), and expired rows removed. */
 export async function nightly(
   pool: Pool,
@@ -166,12 +205,14 @@ export async function nightly(
       'select * from purge_expired()',
     );
     const counts = one(purged.rows);
+    const handoffs = await client.query('delete from sign_in_handoffs where expires_at < now()');
     return {
       unbalanced: audit.rows.map((row) => ({ groupId: row.group_id, currency: row.currency, total: row.total })),
       purged: {
         sessions: Number(counts.sessions),
         invites: Number(counts.invites),
         idempotencyKeys: Number(counts.idempotency_keys),
+        handoffs: handoffs.rowCount ?? 0,
       },
     };
   } finally {

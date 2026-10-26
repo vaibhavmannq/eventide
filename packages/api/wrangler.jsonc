@@ -35,6 +35,10 @@
     { "name": "RL_USER", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
   ],
 
+  // Anyone can make an account: the owner shares the app (and its Android and Windows downloads) with people they
+  // know (2026-10-26). Set to "closed" to go back to invite links and ALLOWED_EMAILS only (docs/DEPLOY.md).
+  "vars": { "SIGNUPS": "open" },
+
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
 }

@@ -52,6 +52,9 @@ export const newMember = z.strictObject({ displayName: name });
 export const acceptBody = z.union([z.strictObject({ displayName: name }), z.strictObject({ claim: id })]);
 export const devLogin = z.strictObject({ email: z.email().max(200), name, next: z.string().max(500).optional() });
 
+const token = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+export const handoffExchange = z.strictObject({ code: token, verifier: token });
+
 export const idempotencyKey = id;
 export const groupId = id;
 export const revision = z.coerce.number().pipe(z.int().min(1));
