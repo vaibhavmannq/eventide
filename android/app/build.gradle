@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = 'io.github.vaibhavmannq.eventide'
-        minSdk = 23
+        minSdk = 24 // Android 7.0; androidbrowserhelper 2.7 needs it
         targetSdk = 36
         // Set by the release workflow: the run number, which only grows, and the version being released.
         versionCode = (project.findProperty('versionCode') ?: '1') as int
