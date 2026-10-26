@@ -31,7 +31,8 @@ offline, and every claim about reliability backed by a test or a measurement.
 - Moving real money. Eventide records that Sam paid Alex back; it does not move the money.
 - Automatic currency conversion (§5.6).
 - Bank or receipt import.
-- Native apps. It is an installable web app (PWA).
+- Native apps. The apps for Android, Windows and Linux are the web app in a wrapper (docs/APPS.md); the site itself
+  no longer offers to install (2026-10-26), so there is one way to get the app on each platform.
 
 ## 3. Requirements
 

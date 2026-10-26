@@ -531,7 +531,7 @@ select {
   color: var(--ink-dim);
 }
 
-.install-hint {
+.apps-link {
   margin-top: 1.5rem;
 }
 
