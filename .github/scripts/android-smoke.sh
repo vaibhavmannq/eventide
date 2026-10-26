@@ -42,3 +42,12 @@ if ! printf '%s' "$page" | grep -q "Sign in with"; then
   exit 1
 fi
 annotate notice "Showing the site" "$(printf '%s' "$page" | head -8)"
+
+# The page starts below the status bar: the WebView's top edge (left,top-right,bottom in its frame) is not 0.
+view=$(adb shell dumpsys activity top | grep -m1 "android.webkit.WebView{")
+top_edge=$(printf '%s' "$view" | grep -oE '[0-9]+,[0-9]+-[0-9]+,[0-9]+' | head -1 | cut -d, -f2 | cut -d- -f1)
+annotate notice "WebView bounds" "$view"
+if [ "${top_edge:-0}" -le 0 ]; then
+  annotate error "The page runs under the status bar" "$view"
+  exit 1
+fi
