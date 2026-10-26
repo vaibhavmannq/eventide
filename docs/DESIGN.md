@@ -283,9 +283,10 @@ become visible at commit time, so a reader can see 12 and 14 before 13 commits, 
   and a 500 never includes internals; the log has them, under the request id.
 - **Data kept:** name, email, and what you enter. No analytics trackers.
 
-### 9.1 Signing in to the Windows app
+### 9.1 Signing in to the apps
 
-The Windows app (desktop/, Tauri) is the live site in a WebView2 window. Google refuses sign-in inside an app's own
+The Windows and Linux app (desktop/, Tauri) and the Android app (android/, a WebView) show the live site in a web
+view of their own. Google refuses sign-in inside an app's own
 web view, and the browser's session cookie cannot be handed to the app, so:
 
 1. When the window starts to open `/api/auth/<provider>`, the app cancels it, makes a 32-byte secret (the
@@ -300,12 +301,12 @@ web view, and the browser's session cookie cannot be handed to the app, so:
    cookie of its own.
 
 Another program that registers `eventide://` and catches the code cannot use it: it lacks the verifier, and its
-attempt uses the code up. `/api/auth/handoff` only answers a user agent containing `EventideDesktop/`, so a link
+attempt uses the code up. `/api/auth/handoff` only answers a user agent containing `EventideDesktop/` or `EventideAndroid/`, so a link
 carrying someone's code and verifier cannot sign an ordinary browser in to their account. This is the same idea
 as PKCE (RFC 7636), applied to the step after the provider.
 
-The Android app needs none of this: it is a Trusted Web Activity, the site running in the phone's Chrome, so it
-shares Chrome's sign-in and cookies (docs/APPS.md).
+The Android app was first a Trusted Web Activity, which shows the site in the phone's default browser. With Brave
+or Firefox as the default, that is a browser tab, not an app, so it became a WebView with the same sign-in (2026-10-26).
 
 ## 10. Capacity and scaling
 

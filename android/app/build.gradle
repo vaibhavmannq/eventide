@@ -1,6 +1,6 @@
-// Eventide for Android: a Trusted Web Activity. The app is the live site, opened full screen in the phone's Chrome
-// (so signing in, cookies and the offline copy are Chrome's own). It only drops the address bar once the site
-// vouches for this app in /.well-known/assetlinks.json, which names the signing key's fingerprint (docs/APPS.md).
+// Eventide for Android: the live site in the app's own WebView (MainActivity), like the Windows and Linux app, so
+// it looks the same whichever browser the phone has. /.well-known/assetlinks.json names the signing key, so
+// invite links open in the app (docs/APPS.md).
 plugins {
     id 'com.android.application'
 }
@@ -13,14 +13,14 @@ android {
 
     defaultConfig {
         applicationId = 'io.github.vaibhavmannq.eventide'
-        minSdk = 24 // Android 7.0; androidbrowserhelper 2.7 needs it
+        minSdk = 24 // Android 7.0
         targetSdk = 36
         // Set by the release workflow: the run number, which only grows, and the version being released.
         versionCode = (project.findProperty('versionCode') ?: '1') as int
         versionName = project.findProperty('versionName') ?: '0.1.0'
 
-        manifestPlaceholders = [host: host, defaultUrl: "https://${host}/"]
-        resValue 'string', 'assetStatements', """[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://${host}"}}]"""
+        manifestPlaceholders = [host: host]
+        resValue 'string', 'home', "https://${host}"
     }
 
     // The key lives only in GitHub's secrets; the workflow writes it to a file for the build and deletes it after.
@@ -43,7 +43,7 @@ android {
         }
     }
 
-    // The site link below (assetStatements) is a generated resource, which build tools 9 leave off by default.
+    // The site's address (resValue 'home' above) is a generated resource, which build tools 9 leave off by default.
     buildFeatures {
         resValues = true
     }
@@ -54,6 +54,3 @@ android {
     }
 }
 
-dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
-}

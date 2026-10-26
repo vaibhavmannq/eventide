@@ -102,7 +102,7 @@ jobs:
           if-no-files-found: error
 
   android-on-a-phone:
-    # The APK opened on an emulator (with Chrome), to catch an app that installs but closes at once.
+    # The APK opened on an emulator, to catch an app that installs but closes at once or shows nothing.
     needs: version
     runs-on: ubuntu-latest
     steps:
@@ -125,6 +125,12 @@ jobs:
       - name: Build a debug APK
         working-directory: android
         run: gradle assembleDebug --no-daemon
+
+      - name: Set up Node from .nvmrc
+        # The emulator test reads the page through DevTools with Node's built-in WebSocket.
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
 
       - name: Let the emulator use hardware acceleration
         run: |
@@ -267,5 +273,5 @@ jobs:
 
           Nothing to install? Eventide also works in any browser.
           NOTES
-          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create "v$VERSION" out/Eventide-* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Eventide $VERSION" --notes-file notes.md

@@ -80,11 +80,12 @@ async function signIn(
 }
 
 /**
- * The Windows app names itself in its user agent. Only it can swap a handoff code, so a link that would sign an
- * ordinary browser in to someone else's account (with a code and verifier of their own) does nothing.
+ * The Windows, Linux and Android apps name themselves in their user agent. Only they can swap a handoff code, so a
+ * link that would sign an ordinary browser in to someone else's account (with a code and verifier of their own)
+ * does nothing.
  */
-const fromDesktopApp = (c: Parameters<MiddlewareHandler<AppEnv>>[0]) =>
-  /\bEventideDesktop\//.test(c.req.header('User-Agent') ?? '');
+const fromApp = (c: Parameters<MiddlewareHandler<AppEnv>>[0]) =>
+  /\bEventide(Desktop|Android)\//.test(c.req.header('User-Agent') ?? '');
 
 /** A PKCE-style challenge: base64url SHA-256, 43 characters. */
 const CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
@@ -216,7 +217,7 @@ export const auth = new Hono<AppEnv>()
 
   /** The Windows app swaps a handoff code, and the verifier only it holds, for a session in its own web view. */
   .post('/handoff', async (c) => {
-    if (!fromDesktopApp(c)) throw new HttpError(403, 'FORBIDDEN', 'Only the Eventide app can do this');
+    if (!fromApp(c)) throw new HttpError(403, 'FORBIDDEN', 'Only the Eventide app can do this');
     const { code, verifier } = handoffExchange.parse(await c.req.json());
     const handoff = await takeHandoff(c.env.db, code);
     if (!handoff || base64url(await sha256(verifier)) !== handoff.challenge) {

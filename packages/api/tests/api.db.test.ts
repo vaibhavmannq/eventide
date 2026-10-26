@@ -409,7 +409,7 @@ describe('sign in with a provider', () => {
     }
   });
 
-  describe('for the Windows app', () => {
+  describe('for the desktop and Android apps', () => {
     const APP_UA = 'Mozilla/5.0 (Windows NT 10.0) Edg/130.0 EventideDesktop/0.1.0';
     const b64url = (bytes: ArrayBuffer) => Buffer.from(bytes).toString('base64url');
     const verifier = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
@@ -462,6 +462,14 @@ describe('sign in with a provider', () => {
       expect(stolen.headers.getSetCookie()).toEqual([]);
       // Trying used the code up: the real app cannot be raced into accepting it later either.
       expect((await exchange({ code, verifier })).status).toBe(400);
+    });
+
+    it('swaps codes for the Android app too', async () => {
+      const cfg = withProvider({ address: 'ada@example.com', verified: true });
+      const { code } = await browserSignIn(cfg, await challengeFor(verifier));
+      const android =
+        'Mozilla/5.0 (Linux; Android 16; wv) AppleWebKit/537.36 Chrome/140.0 Mobile Safari/537.36 EventideAndroid/0.4.0';
+      expect((await exchange({ code, verifier }, android)).status).toBe(200);
     });
 
     it('swaps codes only for the app, so a link cannot sign a browser in to someone else', async () => {
