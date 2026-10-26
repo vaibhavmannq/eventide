@@ -20,7 +20,8 @@ android {
         versionName = project.findProperty('versionName') ?: '0.1.0'
 
         manifestPlaceholders = [host: host, defaultUrl: "https://${host}/"]
-        resValue 'string', 'assetStatements', """[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://${host}"}}]"""
+        // Android string resources drop bare double quotes, so the JSON's own quotes are escaped (\").
+        resValue 'string', 'assetStatements', """[{\\"relation\\":[\\"delegate_permission/common.handle_all_urls\\"],\\"target\\":{\\"namespace\\":\\"web\\",\\"site\\":\\"https://${host}\\"}}]"""
     }
 
     // The key lives only in GitHub's secrets; the workflow writes it to a file for the build and deletes it after.

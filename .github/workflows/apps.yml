@@ -126,6 +126,16 @@ jobs:
         working-directory: android
         run: gradle assembleDebug --no-daemon
 
+      - name: Check the app's statement about the site is valid JSON
+        run: |
+          python3 -I - android/app/build/outputs/apk/debug/app-debug.apk <<'PY'
+          import json, re, sys, zipfile
+          arsc = zipfile.ZipFile(sys.argv[1]).read('resources.arsc').decode('utf-8', 'ignore')
+          found = re.search(r'\[\{.*?\}\}\]', arsc)
+          json.loads(found.group(0) if found else '')
+          print('asset statement:', found.group(0))
+          PY
+
       - name: Let the emulator use hardware acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
@@ -267,5 +277,5 @@ jobs:
 
           Nothing to install? Eventide also works in any browser.
           NOTES
-          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create "v$VERSION" out/Eventide-* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Eventide $VERSION" --notes-file notes.md
