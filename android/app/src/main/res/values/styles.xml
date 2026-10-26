@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The night behind the page while it loads, so the app never flashes white. -->
+    <style name="Night" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night</item>
+        <item name="android:statusBarColor">@color/night</item>
+        <item name="android:navigationBarColor">@color/night</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

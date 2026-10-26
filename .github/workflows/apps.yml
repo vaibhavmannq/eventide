@@ -102,7 +102,7 @@ jobs:
           if-no-files-found: error
 
   android-on-a-phone:
-    # The APK opened on an emulator (with Chrome), to catch an app that installs but closes at once.
+    # The APK opened on an emulator, to catch an app that installs but closes at once or shows nothing.
     needs: version
     runs-on: ubuntu-latest
     steps:
@@ -125,16 +125,6 @@ jobs:
       - name: Build a debug APK
         working-directory: android
         run: gradle assembleDebug --no-daemon
-
-      - name: Check the app's statement about the site is valid JSON
-        run: |
-          python3 -I - android/app/build/outputs/apk/debug/app-debug.apk <<'PY'
-          import json, re, sys, zipfile
-          arsc = zipfile.ZipFile(sys.argv[1]).read('resources.arsc').decode('utf-8', 'ignore')
-          found = re.search(r'\[\{.*?\}\}\]', arsc)
-          json.loads(found.group(0) if found else '')
-          print('asset statement:', found.group(0))
-          PY
 
       - name: Let the emulator use hardware acceleration
         run: |

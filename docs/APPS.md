@@ -7,14 +7,14 @@ developer account); there the site works in Safari.
 
 | | What it is | Where |
 |---|---|---|
-| Android | A Trusted Web Activity: the site full screen in the phone's Chrome, with Chrome's sign-in and offline copy | `android/` |
+| Android | A small native app: the site in its own WebView, whatever the phone's browser; signing in goes through the browser, like the desktop (DESIGN §9.1) | `android/` |
 | Windows | Tauri: the site in a WebView2 window; signing in goes through the browser (DESIGN §9.1) | `desktop/` |
 | Linux | The same Tauri app, on WebKitGTK: a `.deb` and an AppImage | `desktop/` |
 
 Releases are built by `.github/workflows/apps.yml` and published on the repository's Releases page, which the
 site links to. Pull requests that touch the apps build them all, unsigned, and open the Android app on an
-emulator (`.github/scripts/android-smoke.sh`): a crash on start fails the check, with the crash log as an
-annotation on the run.
+emulator (`.github/scripts/android-smoke.sh`): a crash on start, or the site not showing in the app's window,
+fails the check, with the reason as an annotation on the run.
 
 ## One-time setup: the Android signing key
 
