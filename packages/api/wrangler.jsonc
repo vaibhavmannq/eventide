@@ -40,7 +40,10 @@
   //
   // ANDROID_CERT_SHA256: the Android app's signing key fingerprint (docs/APPS.md), served at
   // /.well-known/assetlinks.json so the app opens without an address bar. Public by design.
-  "vars": { "SIGNUPS": "open", "ANDROID_CERT_SHA256": "7D:B1:F7:30:23:EA:A5:A7:09:CE:45:69:8D:BE:6F:C1:18:1F:C8:BB:5F:07:75:FB:90:49:96:FD:99:6C:60:E2" },
+  "vars": {
+    "SIGNUPS": "open",
+    "ANDROID_CERT_SHA256": "7D:B1:F7:30:23:EA:A5:A7:09:CE:45:69:8D:BE:6F:C1:18:1F:C8:BB:5F:07:75:FB:90:49:96:FD:99:6C:60:E2"
+  },
 
   "triggers": { "crons": ["17 3 * * *"] },
   "observability": { "enabled": true }
