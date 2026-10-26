@@ -1,11 +1,13 @@
 export {
   acceptInvite,
+  createHandoff,
   createInvite,
   createSession,
   deleteGroup,
   deleteSession,
   type Group,
   getGroup,
+  HANDOFF_SECONDS,
   INVITE_DAYS,
   type InvitePreview,
   inviteIsValid,
@@ -15,6 +17,7 @@ export {
   previewInvite,
   removeMember,
   SESSION_DAYS,
+  takeHandoff,
   userExists,
   userForSession,
 } from './accounts.ts';

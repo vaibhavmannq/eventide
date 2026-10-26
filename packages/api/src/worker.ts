@@ -5,6 +5,7 @@
 import { nightly } from '@eventide/db';
 import pg from 'pg';
 import { app } from './app.ts';
+import { assetLinks } from './assetlinks.ts';
 import { type Config, github, google } from './config.ts';
 
 interface Env {
@@ -25,6 +26,11 @@ interface Env {
    * test run would spend the per-IP budget meant for one person. Production never sets it.
    */
   RATE_LIMITS?: string;
+  /**
+   * The Android app's signing key, as keytool prints its SHA-256 fingerprint (AA:BB:…), comma-separated if more
+   * than one. Public, so it lives in wrangler.jsonc. Until it is set the app still works, with an address bar.
+   */
+  ANDROID_CERT_SHA256?: string;
   /** Cloudflare's rate limiting bindings (wrangler.jsonc, `ratelimits`). */
   RL_IP?: RateLimit;
   RL_USER?: RateLimit;
@@ -90,6 +96,9 @@ function poolFor(env: Env) {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (new URL(request.url).pathname === '/.well-known/assetlinks.json') {
+      return assetLinks(env.ANDROID_CERT_SHA256) ?? new Response('Not found', { status: 404 });
+    }
     const { pool, close } = poolFor(env);
     try {
       return await app.fetch(request, { db: pool, config: configFrom(env) }, ctx as never);

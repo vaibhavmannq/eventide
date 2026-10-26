@@ -409,6 +409,74 @@ describe('sign in with a provider', () => {
     }
   });
 
+  describe('for the Windows app', () => {
+    const APP_UA = 'Mozilla/5.0 (Windows NT 10.0) Edg/130.0 EventideDesktop/0.1.0';
+    const b64url = (bytes: ArrayBuffer) => Buffer.from(bytes).toString('base64url');
+    const verifier = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+    const challengeFor = async (v: string) =>
+      b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+
+    async function browserSignIn(cfg: Config, challenge: string) {
+      const begin = await call('GET', `/auth/github?next=%2Fgroups&handoff=${challenge}`, { config: cfg });
+      const state = new URL(begin.headers.get('Location') ?? '').searchParams.get('state');
+      const callback = await call('GET', `/auth/github/callback?code=good&state=${state}`, {
+        cookie: cookieFrom(begin.headers, '__Host-oauth'),
+        config: cfg,
+      });
+      const location = callback.headers.get('Location') ?? '';
+      return { callback, code: /^\/desktop-return#code=([\w-]{43})$/.exec(location)?.[1] };
+    }
+
+    const exchange = (body: unknown, userAgent = APP_UA) =>
+      app.request(
+        `${ORIGIN}/api/auth/handoff`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Origin: ORIGIN, 'User-Agent': userAgent },
+          body: JSON.stringify(body),
+        },
+        { db: db.app, config: config() },
+      );
+
+    it('gives the browser no session, and the app a code it can swap once, with its verifier', async () => {
+      const cfg = withProvider({ address: 'ada@example.com', verified: true });
+      const { callback, code } = await browserSignIn(cfg, await challengeFor(verifier));
+      expect(code).toBeTruthy();
+      expect(callback.headers.getSetCookie().some((c) => c.startsWith('__Host-session='))).toBe(false);
+
+      const swapped = await exchange({ code, verifier });
+      expect(swapped.status).toBe(200);
+      expect(await swapped.json()).toEqual({ next: '/groups' });
+      const me = await call('GET', '/me', { cookie: cookieFrom(swapped.headers) });
+      expect(me.json.user).toMatchObject({ email: 'ada@example.com' });
+
+      expect((await exchange({ code, verifier })).status).toBe(400);
+    });
+
+    it('refuses a code caught by another program that does not hold the verifier', async () => {
+      const cfg = withProvider({ address: 'ada@example.com', verified: true });
+      const { code } = await browserSignIn(cfg, await challengeFor(verifier));
+      const thief = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+      const stolen = await exchange({ code, verifier: thief });
+      expect(stolen.status).toBe(400);
+      expect(stolen.headers.getSetCookie()).toEqual([]);
+      // Trying used the code up: the real app cannot be raced into accepting it later either.
+      expect((await exchange({ code, verifier })).status).toBe(400);
+    });
+
+    it('swaps codes only for the app, so a link cannot sign a browser in to someone else', async () => {
+      const cfg = withProvider({ address: 'ada@example.com', verified: true });
+      const { code } = await browserSignIn(cfg, await challengeFor(verifier));
+      const browser = await exchange({ code, verifier }, 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0');
+      expect(browser.status).toBe(403);
+    });
+
+    it('refuses a malformed challenge', async () => {
+      const cfg = withProvider({ address: 'ada@example.com', verified: true });
+      expect((await call('GET', '/auth/github?handoff=short', { config: cfg })).status).toBe(400);
+    });
+  });
+
   it('says so when a provider is not set up', async () => {
     expect((await call('GET', '/auth/google', { config: withProvider(null) })).status).toBe(404);
   });
