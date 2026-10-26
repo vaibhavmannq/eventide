@@ -56,7 +56,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.8.1'
 
       - name: Write the signing key to a file
         if: env.RELEASING == 'true'
@@ -72,7 +72,14 @@ jobs:
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           VERSION: ${{ needs.version.outputs.version }}
-        run: gradle assembleRelease --no-daemon "-PversionName=$VERSION" "-PversionCode=$GITHUB_RUN_NUMBER"
+        # On failure, Gradle's own explanation becomes an annotation on the run, readable without opening the log.
+        run: |
+          set -o pipefail
+          if ! gradle assembleRelease --no-daemon "-PversionName=$VERSION" "-PversionCode=$GITHUB_RUN_NUMBER" 2>&1 | tee build.log; then
+            message=$(grep -A 20 "What went wrong" build.log | head -30 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=Gradle build failed::${message:-see the log}"
+            exit 1
+          fi
 
       - name: Remove the signing key
         if: always()

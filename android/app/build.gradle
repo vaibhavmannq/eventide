@@ -8,16 +8,16 @@ plugins {
 def host = 'eventide.vaibhavmann-10.workers.dev'
 
 android {
-    namespace 'io.github.vaibhavmannq.eventide'
-    compileSdk 35
+    namespace = 'io.github.vaibhavmannq.eventide'
+    compileSdk = 36
 
     defaultConfig {
-        applicationId 'io.github.vaibhavmannq.eventide'
-        minSdk 23
-        targetSdk 35
+        applicationId = 'io.github.vaibhavmannq.eventide'
+        minSdk = 24 // Android 7.0; androidbrowserhelper 2.7 needs it
+        targetSdk = 36
         // Set by the release workflow: the run number, which only grows, and the version being released.
-        versionCode((project.findProperty('versionCode') ?: '1') as int)
-        versionName project.findProperty('versionName') ?: '0.1.0'
+        versionCode = (project.findProperty('versionCode') ?: '1') as int
+        versionName = project.findProperty('versionName') ?: '0.1.0'
 
         manifestPlaceholders = [host: host, defaultUrl: "https://${host}/"]
         resValue 'string', 'assetStatements', """[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://${host}"}}]"""
@@ -28,27 +28,32 @@ android {
         release {
             def keystore = System.getenv('ANDROID_KEYSTORE_FILE')
             if (keystore) {
-                storeFile file(keystore)
-                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
-                keyAlias 'eventide'
-                keyPassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                storeFile = file(keystore)
+                storePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias = 'eventide'
+                keyPassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
             }
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
-            if (System.getenv('ANDROID_KEYSTORE_FILE')) signingConfig signingConfigs.release
+            minifyEnabled = false
+            if (System.getenv('ANDROID_KEYSTORE_FILE')) signingConfig = signingConfigs.release
         }
     }
 
+    // The site link below (assetStatements) is a generated resource, which build tools 9 leave off by default.
+    buildFeatures {
+        resValues = true
+    }
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
 dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
 }

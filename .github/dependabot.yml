@@ -6,8 +6,13 @@ updates:
     directory: /
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }
+    ignore:
+      # Node's types follow the Node version in .nvmrc (and Cloudflare's runtime), not the newest Node.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
-      dependencies: { patterns: ['*'] }
+      # Minor and patch updates together; each major version on its own, to be read before it is merged.
+      dependencies: { patterns: ['*'], update-types: [minor, patch] }
 
   - package-ecosystem: github-actions
     directory: /
@@ -19,7 +24,8 @@ updates:
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }
     groups:
-      dependencies: { patterns: ['*'] }
+      # Minor and patch updates together; each major version on its own, to be read before it is merged.
+      dependencies: { patterns: ['*'], update-types: [minor, patch] }
 
   - package-ecosystem: gradle
     directory: /android
