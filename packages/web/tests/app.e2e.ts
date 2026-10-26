@@ -310,3 +310,29 @@ test('the privacy policy is readable without signing in, and linked from the sig
   await page.goto('/privacy');
   await expect(page.getByRole('heading', { name: 'What Eventide keeps, and why' })).toBeVisible();
 });
+
+test('the pages carry a strict content security policy, and nothing in the app trips it', async ({ browser }) => {
+  const context = await browser.newContext(test.info().project.use);
+  const page = await context.newPage();
+  const blocked: string[] = [];
+  page.on('console', (message) => {
+    if (/Content Security Policy|Refused to/i.test(message.text())) blocked.push(message.text());
+  });
+  const response = await page.goto('/');
+  const csp = response?.headers()['content-security-policy'] ?? '';
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).toContain("frame-ancestors 'none'");
+
+  await page.getByLabel('Email').fill(`csp-${Date.now()}@example.com`);
+  await page.getByLabel('Name').fill('Casey');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('link', { name: /New group/ }).click();
+  await page.getByLabel('Group name').fill('Strict');
+  await page.getByRole('button', { name: 'Create group' }).click();
+  await page.getByRole('link', { name: /Add expense/ }).click();
+  await page.getByLabel('Amount', { exact: true }).fill('12');
+  await page.getByLabel('What for').fill('Tea');
+  await page.getByRole('button', { name: 'Add expense' }).click();
+  await expect(page.getByText('All saved')).toBeVisible();
+  expect(blocked).toEqual([]);
+});

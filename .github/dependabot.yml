@@ -1,0 +1,15 @@
+# Keeps dependencies current, but never with a release younger than a week: most hijacked npm and crates
+# releases are caught and pulled within days. Security fixes are still proposed as soon as they are past it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
+    groups:
+      dependencies: { patterns: ['*'] }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
