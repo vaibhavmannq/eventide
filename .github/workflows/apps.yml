@@ -7,7 +7,7 @@ name: Apps
 # Needs these repository secrets for a release: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD.
 on:
   pull_request:
-    paths: ['android/**', 'desktop/**', '.github/workflows/apps.yml']
+    paths: ['android/**', 'desktop/**', '.github/workflows/apps.yml', '.github/scripts/**']
   workflow_dispatch:
     inputs:
       version:
@@ -101,6 +101,53 @@ jobs:
           path: Eventide-android*.apk
           if-no-files-found: error
 
+  android-on-a-phone:
+    # The APK opened on an emulator (with Chrome), to catch an app that installs but closes at once.
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          gradle-version: '9.8.1'
+
+      - name: Build a debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Let the emulator use hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Open it on an emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis_playstore
+          arch: x86_64
+          script: .github/scripts/android-smoke.sh
+
+      - name: Keep the screenshot
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-screen
+          path: android-screen.png
+          if-no-files-found: ignore
+
   windows:
     needs: version
     runs-on: windows-latest
@@ -129,7 +176,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.version.outputs.version }}
-        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --config "{\"version\":\"$VERSION\"}"
+        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --bundles nsis --config "{\"version\":\"$VERSION\"}"
 
       - name: Name the installer
         shell: bash
@@ -142,9 +189,56 @@ jobs:
           path: Eventide-windows-setup.exe
           if-no-files-found: error
 
+  linux:
+    needs: version
+    # The oldest supported Ubuntu, so the .deb and AppImage run on as many distributions as possible.
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the libraries Tauri builds against
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Test the app's own code
+        working-directory: desktop/src-tauri
+        run: cargo test --locked
+
+      - name: Build the .deb and the AppImage
+        working-directory: desktop
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: npx --yes @tauri-apps/cli@2.12.4 build --ci --bundles deb,appimage --config "{\"version\":\"$VERSION\"}"
+
+      - name: Name them
+        run: |
+          cp desktop/src-tauri/target/release/bundle/deb/*.deb Eventide-linux-amd64.deb
+          cp desktop/src-tauri/target/release/bundle/appimage/*.AppImage Eventide-linux-x86_64.AppImage
+
+      - name: Keep them
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: Eventide-linux-*
+          if-no-files-found: error
+
   release:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [version, android, windows]
+    needs: [version, android, android-on-a-phone, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -168,7 +262,10 @@ jobs:
           Windows SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**. Signing in opens
           your browser once, then returns you to the app.
 
-          Nothing to install? Eventide also works in any browser: open the site and choose Install.
+          **Linux:** `Eventide-linux-amd64.deb` for Ubuntu, Debian and Mint (`sudo apt install ./Eventide-linux-amd64.deb`),
+          or `Eventide-linux-x86_64.AppImage` for any other distribution (`chmod +x` it, then run it).
+
+          Nothing to install? Eventide also works in any browser.
           NOTES
           gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Eventide $VERSION" --notes-file notes.md

@@ -333,12 +333,26 @@ test('signing in for the Windows app: the browser hands the code over, and a bad
   await expect(app.getByRole('heading', { name: 'Eventide' })).toBeVisible();
 });
 
-test('the sign-in screen links to the Android and Windows downloads', async ({ page }) => {
+test('the site offers the apps instead of a browser install, and the apps do not offer themselves', async ({
+  browser,
+}) => {
+  const page = await browser.newPage(test.info().project.use);
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Android & Windows apps' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Android, Windows & Linux apps' })).toHaveAttribute(
     'href',
     'https://github.com/vaibhavmannq/eventide/releases/latest',
   );
+  // No web app manifest, so browsers have nothing to install.
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
+
+  const inTheApp = await browser.newContext({
+    ...test.info().project.use,
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0) Edg/130.0 EventideDesktop/0.2.0',
+  });
+  const app = await inTheApp.newPage();
+  await app.goto('/');
+  await expect(app.getByRole('heading', { name: 'Eventide' })).toBeVisible();
+  await expect(app.getByRole('link', { name: /Linux apps/ })).toHaveCount(0);
 });
 
 test('the pages carry a strict content security policy, and nothing in the app trips it', async ({ browser }) => {

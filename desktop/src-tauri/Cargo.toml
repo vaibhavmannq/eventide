@@ -1,7 +1,7 @@
 [package]
 name = "eventide-desktop"
 version = "0.1.0"
-description = "Eventide for Windows: the web app in its own window"
+description = "Eventide for Windows and Linux: the web app in its own window"
 edition = "2021"
 publish = false
 
