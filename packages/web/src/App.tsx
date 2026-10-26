@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { match, path } from './lib/router.ts';
 import { me } from './lib/store.ts';
+import { DesktopFinish, DesktopReturn } from './screens/Desktop.tsx';
 import { ExpenseForm } from './screens/ExpenseForm.tsx';
 import { GroupScreen } from './screens/Group.tsx';
 import { Groups } from './screens/Groups.tsx';
@@ -22,6 +23,8 @@ const routes: [string, (p: Record<string, string>) => JSX.Element][] = [
 
 export function App() {
   if (match('/privacy', path.value)) return <Privacy />; // readable without signing in
+  if (match('/desktop-return', path.value)) return <DesktopReturn />; // in the browser, for the Windows app
+  if (match('/desktop', path.value)) return <DesktopFinish />; // in the Windows app
   if (me.value === undefined) return <main class="page" aria-busy="true" />;
   if (me.value === null) return <SignIn />;
   for (const [pattern, screen] of routes) {

@@ -2,6 +2,9 @@ import { useState } from 'preact/hooks';
 import { api } from '../lib/api.ts';
 import { providers } from '../lib/store.ts';
 
+/** Where the Android APK and the Windows installer are published (.github/workflows/release.yml). */
+const DOWNLOADS = 'https://github.com/vaibhavmannq/eventide/releases/latest';
+
 /** Signed out. The night sea from the portfolio behind it, and one way in. */
 export function SignIn({ next = location.pathname + location.search }: { next?: string }) {
   const outcome = new URLSearchParams(location.search).get('signin');
@@ -41,8 +44,12 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
           )}
         </div>
         {p.dev && <DevSignIn next={next} />}
-        <p class="signin-footer">
-          <a class="mono link" href="/privacy">
+        <p class="signin-footer mono">
+          <a class="link" href={DOWNLOADS}>
+            Android &amp; Windows apps
+          </a>
+          <span aria-hidden="true"> · </span>
+          <a class="link" href="/privacy">
             Privacy
           </a>
         </p>
