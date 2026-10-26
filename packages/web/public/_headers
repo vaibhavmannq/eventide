@@ -1,0 +1,9 @@
+# Security headers for the app's own pages and files, which Cloudflare serves without running the Worker (the
+# API sets its own, packages/api/src/app.ts). Everything the app loads comes from this origin, so the policy says
+# exactly that: no other site's scripts can run here, and no other site can frame it (clickjacking).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Strict-Transport-Security: max-age=31536000
