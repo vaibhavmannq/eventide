@@ -43,6 +43,11 @@ android {
         }
     }
 
+    // The site link below (assetStatements) is a generated resource, which build tools 9 leave off by default.
+    buildFeatures {
+        resValues = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
