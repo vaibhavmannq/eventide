@@ -371,6 +371,15 @@ select {
   color: var(--bad);
 }
 
+/* A sign-in button the app has handed to the browser (SignIn.tsx): still a link, if the browser was closed. */
+.pill-waiting {
+  opacity: 0.75;
+}
+
+.signin-waiting {
+  margin: 0.9rem 0 0;
+}
+
 .pill:disabled {
   opacity: 0.5;
   cursor: default;
@@ -392,7 +401,7 @@ select {
 }
 
 .tag {
-  font-size: 0.62rem;
+  font-size: 0.75rem; /* 12px, the smallest text anywhere */
   color: var(--glow);
   margin-left: 0.6rem;
 }
@@ -471,6 +480,20 @@ select {
   gap: 1rem;
 }
 
+/* A first visit: three short steps beside the new moon. */
+.steps {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.7rem;
+  line-height: 1.5;
+}
+
+.steps strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
 /* ─── Lists: hairlines, never boxes ────────────────────────────────────────── */
 
 .rows,
@@ -538,7 +561,7 @@ select {
 .empty {
   display: flex;
   gap: 1.25rem;
-  align-items: center;
+  align-items: flex-start;
   color: var(--ink-dim);
   max-width: 42ch;
   margin-bottom: 1rem;
@@ -597,7 +620,7 @@ select {
 .day {
   color: var(--ink-faint);
   margin: 1.75rem 0 0.25rem;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .row {
@@ -638,7 +661,7 @@ select {
 }
 
 .share .mono {
-  font-size: 0.6rem;
+  font-size: 0.75rem;
 }
 
 .share-owed {
@@ -765,7 +788,8 @@ select {
 }
 
 .field input::placeholder {
-  color: rgba(230, 238, 240, 0.3);
+  /* 54%: at least 4.5:1 against the night and the brightest sky (WCAG AA), still lighter than what you type. */
+  color: rgba(230, 238, 240, 0.54);
 }
 
 .amount-row {

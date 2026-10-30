@@ -380,3 +380,112 @@ test('the pages carry a strict content security policy, and nothing in the app t
   await expect(page.getByText('All saved')).toBeVisible();
   expect(blocked).toEqual([]);
 });
+
+/** WCAG contrast ratio of two sRGB colours, 'rgb(a, b, c)' or 'rgba(a, b, c, alpha)' over `under`. */
+function contrast(css: string, under: [number, number, number]): number {
+  const [r = 0, g = 0, b = 0, a = 1] = (css.match(/[\d.]+/g) ?? []).map(Number);
+  const mixed = [r, g, b].map((c, i) => c * a + (under[i] ?? 0) * (1 - a));
+  const luminance = (rgb: number[]) => {
+    const [lr = 0, lg = 0, lb = 0] = rgb.map((c) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  };
+  const [hi, lo] = [luminance(mixed), luminance(under)].sort((x, y) => y - x);
+  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+}
+
+test('readable: a first visit explains the steps, placeholders pass contrast, and nothing is smaller than the labels', async ({
+  browser,
+}) => {
+  const page = await person(browser, 'Riya');
+  // A first visit: three steps, including that friends need not have the app.
+  const steps = page.locator('ol.steps li');
+  await expect(steps).toHaveCount(3);
+  await expect(steps.nth(1)).toContainText('they don’t need the app');
+
+  await page.getByRole('link', { name: /New group/ }).click();
+  await page.getByLabel('Group name').fill('Readable');
+  await page.getByRole('button', { name: 'Create group' }).click();
+  await page.getByRole('link', { name: /Add expense/ }).click();
+
+  // Placeholder text, measured against the night and the brightest part of the sky.
+  const placeholder = await page
+    .getByLabel('What for')
+    .evaluate((input) => getComputedStyle(input, '::placeholder').color);
+  expect(contrast(placeholder, [2, 4, 6])).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(placeholder, [24, 49, 56])).toBeGreaterThanOrEqual(4.5);
+
+  await page.getByLabel('Amount', { exact: true }).fill('120');
+  await page.getByLabel('What for').fill('Tea');
+  await page.getByRole('button', { name: 'Add expense' }).click();
+  await expect(page.getByText('All saved')).toBeVisible();
+
+  // Section headings say what they are, without numbering.
+  for (const name of ['Where you stand', 'Activity']) {
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  }
+  // Every piece of visible text on the group screen is at least as large as the mono labels (0.72rem, 11.5px);
+  // the smallest ones (the day, YOU LENT, your share) were raised to 12px.
+  const smallest = await page.evaluate(() => {
+    let min = Number.POSITIVE_INFINITY;
+    let where = '';
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const element = node.parentElement;
+      if (!element || !node.textContent?.trim() || element.closest('[aria-hidden="true"]')) continue;
+      const box = element.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const size = Number.parseFloat(getComputedStyle(element).fontSize);
+      if (size < min) {
+        min = size;
+        where = `${element.className}: ${node.textContent.trim()}`;
+      }
+    }
+    return { min, where };
+  });
+  expect(smallest.min, smallest.where).toBeGreaterThanOrEqual(11.5);
+});
+
+test('in the apps, a sign-in button says where you went once pressed; nothing extra until then', async ({
+  browser,
+}) => {
+  const androidApp = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140.0 Mobile EventideAndroid/0.6.0';
+  for (const userAgent of [undefined, androidApp]) {
+    const context = await browser.newContext({ ...test.info().project.use, ...(userAgent ? { userAgent } : {}) });
+    const page = await context.newPage();
+    // Show the provider buttons (local development has none).
+    await page.route('**/api/auth/providers', (route) =>
+      route.fulfill({ json: { github: true, google: true, dev: false } }),
+    );
+    if (userAgent) {
+      // Stand in for the app, which cancels a sign-in link and opens it in the browser instead (MainActivity.route,
+      // desktop on_navigation): the page's own click handler still runs, but nothing navigates.
+      await page.addInitScript(() => {
+        document.addEventListener(
+          'click',
+          (event) => {
+            const link = (event.target as Element).closest('a');
+            if (link && /^\/api\/auth\/(github|google)$/.test(new URL(link.href).pathname)) event.preventDefault();
+          },
+          true,
+        );
+      });
+    }
+    await page.goto('/');
+    const google = page.getByRole('link', { name: 'Sign in with Google' });
+    await expect(google).toBeVisible();
+    await expect(page.getByRole('status')).toHaveCount(0);
+    if (!userAgent) {
+      await context.close();
+      continue; // on the website the link simply leaves the page
+    }
+
+    await google.click();
+    await expect(page.getByRole('link', { name: 'Continue in your browser…' })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Sign in there, and Eventide opens again on its own.');
+    await expect(page.getByRole('link', { name: /Sign in with GitHub/ })).toBeVisible();
+    await context.close();
+  }
+});

@@ -64,7 +64,7 @@ export function GroupScreen({ id }: { id: string }) {
         <div class="group-columns">
           <section class="summary" aria-labelledby="where">
             <h2 class="mono label" id="where">
-              I · Where you stand
+              Where you stand
             </h2>
             <div class="standing-block">
               <Moon lit={s.lit} size={72} label={s.lit === 1 ? 'Full moon: everyone is even' : undefined} />
@@ -76,7 +76,7 @@ export function GroupScreen({ id }: { id: string }) {
 
             {summaries.some((x) => x.settleUp.length > 0) && (
               <div class="section">
-                <h2 class="mono label">II · Settle up</h2>
+                <h2 class="mono label">Settle up</h2>
                 <ul class="settle-list">
                   {summaries.flatMap((x) =>
                     x.settleUp.map((t) => (
@@ -119,7 +119,7 @@ export function GroupScreen({ id }: { id: string }) {
 
           <section class="activity section" aria-labelledby="activity">
             <h2 class="mono label" id="activity">
-              {summaries.some((x) => x.settleUp.length > 0) ? 'III' : 'II'} · Activity
+              Activity
             </h2>
             {failed.length > 0 && (
               <ul class="failed-list">
