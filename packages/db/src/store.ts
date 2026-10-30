@@ -9,6 +9,7 @@ import {
 } from '@eventide/ledger';
 import { asUser, type Pool, type Queryable } from './connection.ts';
 import { StoreError } from './errors.ts';
+import { checkChangesToday, checkNewGroup, checkNewPerson } from './limits.ts';
 import { canonicalJson, equalBytes, minor, one, sha256 } from './util.ts';
 
 export interface User {
@@ -90,6 +91,7 @@ export async function createGroup(
   input: { name: string; currency: string; displayName: string },
 ): Promise<{ groupId: string }> {
   return asUser(pool, userId, async (sql) => {
+    await checkNewGroup(sql, userId);
     const { rows } = await sql.query<{ id: string }>('select create_group($1, $2, $3) as id', [
       input.name,
       input.currency,
@@ -103,6 +105,7 @@ export async function createGroup(
 export async function addMember(pool: Pool, userId: string, groupId: string, displayName: string): Promise<Member> {
   return asUser(pool, userId, async (sql) => {
     await lockGroup(sql, groupId);
+    await checkNewPerson(sql, groupId);
     const { rows } = await sql.query<Member>(
       `insert into members (group_id, display_name) values ($1, $2)
        returning id, display_name as "displayName", user_id as "userId", role`,
@@ -136,6 +139,7 @@ export async function listMembers(pool: Pool, userId: string, groupId: string): 
 export async function recordTransaction(pool: Pool, userId: string, input: RecordInput): Promise<TransactionView> {
   return asUser(pool, userId, (sql) =>
     idempotent(sql, userId, input.idempotencyKey, { op: 'record', ...input }, async () => {
+      await checkChangesToday(sql); // before the group's lock (in the statement below), so it is not held longer
       const postings = await validate(sql, input.groupId, input.transaction);
       // Amounts go over the wire as text so nothing passes through a float on the way to bigint.
       const { rows } = await sql.query<{ seq: string | null; inserted: boolean }>(
@@ -187,6 +191,7 @@ export async function recordTransaction(pool: Pool, userId: string, input: Recor
 export async function editTransaction(pool: Pool, userId: string, input: EditInput): Promise<TransactionView> {
   return asUser(pool, userId, (sql) =>
     idempotent(sql, userId, input.idempotencyKey, { op: 'edit', ...input }, async () => {
+      await checkChangesToday(sql);
       const seq = await nextSeq(sql, input.groupId);
       const current = await lockCurrent(sql, input.groupId, input.id, input.expectedRevision);
       if (current.transaction.kind !== input.transaction.kind) {
@@ -222,6 +227,7 @@ export async function editTransaction(pool: Pool, userId: string, input: EditInp
 export async function deleteTransaction(pool: Pool, userId: string, input: DeleteInput): Promise<TransactionView> {
   return asUser(pool, userId, (sql) =>
     idempotent(sql, userId, input.idempotencyKey, { op: 'delete', ...input }, async () => {
+      await checkChangesToday(sql);
       const seq = await nextSeq(sql, input.groupId);
       const current = await lockCurrent(sql, input.groupId, input.id, input.expectedRevision);
       const postings = reversePostings(await netPostings(sql, input.id));

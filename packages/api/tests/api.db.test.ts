@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { LIMITS } from '@eventide/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../../db/tests/harness.ts';
 import { app } from '../src/app.ts';
@@ -169,6 +170,38 @@ describe('a flat sharing costs', () => {
     const group = await call('GET', `/groups/${groupId}`, { cookie: bob });
     member.bob = group.json.group.members.find((m: { displayName: string }) => m.displayName === 'Bob').id;
     expect((await call('GET', '/groups', { cookie: bob })).json.groups).toHaveLength(1);
+  });
+
+  it('refuses an amount beyond a trillion minor units', async () => {
+    const body = (total: number) => ({
+      id: randomUUID(),
+      description: 'Absurd',
+      occurredOn: '2026-10-25',
+      transaction: {
+        kind: 'expense',
+        currency: 'GBP',
+        total,
+        paidBy: [{ member: member.alice, amount: total }],
+        split: { kind: 'equal', members: [member.alice, member.bob] },
+      },
+    });
+    const tooMuch = await call('POST', `/groups/${groupId}/transactions`, {
+      cookie: alice,
+      key: randomUUID(),
+      body: body(1_000_000_000_001),
+    });
+    expect(tooMuch.status).toBe(400);
+    expect(tooMuch.json.error.code).toBe('INVALID_REQUEST');
+  });
+
+  it('says plainly when a limit is reached: 403, not a retryable error', async () => {
+    let last = { status: 0, json: null as { error: { code: string; message: string } } | null };
+    for (let n = 0; n <= LIMITS.openInvitesPerGroup; n++) {
+      last = await call('POST', `/groups/${groupId}/invites`, { cookie: alice });
+    }
+    expect(last.status).toBe(403);
+    expect(last.json?.error.code).toBe('LIMIT_REACHED');
+    expect(last.json?.error.message).toMatch(/invite links that still work/);
   });
 
   it('records an expense once, however many times it is sent', async () => {
@@ -483,6 +516,21 @@ describe('sign in with a provider', () => {
       const cfg = withProvider({ address: 'ada@example.com', verified: true });
       expect((await call('GET', '/auth/github?handoff=short', { config: cfg })).status).toBe(400);
     });
+  });
+
+  it('checks where it sends you again at the callback, even if the sign-in cookie was tampered with', async () => {
+    const cfg = withProvider({ address: 'grace@example.com', verified: true });
+    const forged = {
+      state: 'forged-state',
+      verifier: 'v'.repeat(43),
+      provider: 'github',
+      next: 'https://evil.example',
+    };
+    const callback = await call('GET', '/auth/github/callback?code=good&state=forged-state', {
+      cookie: `__Host-oauth=${btoa(JSON.stringify(forged))}`,
+      config: cfg,
+    });
+    expect(callback.headers.get('Location')).toBe('/');
   });
 
   it('says so when a provider is not set up', async () => {

@@ -23,6 +23,7 @@ export {
 } from './accounts.ts';
 export { asUser, type Pool, type PoolClient, type Queryable } from './connection.ts';
 export { StoreError, type StoreErrorCode } from './errors.ts';
+export { LIMITS } from './limits.ts';
 export {
   addMember,
   type Change,

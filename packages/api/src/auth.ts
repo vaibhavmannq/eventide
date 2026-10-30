@@ -208,11 +208,12 @@ export const auth = new Hono<AppEnv>()
     if (flow.handoff) {
       // Started by the Windows app: this browser gets no session, the app gets a code for one. The code travels
       // in the fragment, which never reaches a server or its logs.
-      const handoffCode = await createHandoff(c.env.db, user.id, flow.handoff, flow.next);
+      const handoffCode = await createHandoff(c.env.db, user.id, flow.handoff, safeNext(flow.next));
       return c.redirect(`/desktop-return#code=${handoffCode}`, 302);
     }
     await startSession(c, user.id);
-    return c.redirect(flow.next, 302);
+    // Checked when it was stored, and the __Host- cookie cannot be set by another site; checked again anyway.
+    return c.redirect(safeNext(flow.next), 302);
   })
 
   /** The Windows app swaps a handoff code, and the verifier only it holds, for a session in its own web view. */
