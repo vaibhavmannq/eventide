@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.util.Base64;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -60,6 +61,9 @@ public class MainActivity extends Activity {
         settings.setUserAgentString(settings.getUserAgentString() + " EventideAndroid/" + version());
         CookieManager.getInstance().setAcceptCookie(true);
 
+        // Without a WebChromeClient a WebView shows no confirm() or alert() and confirm() answers "no": deleting an
+        // expense, removing someone or leaving a group would silently do nothing. The default one shows them.
+        web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

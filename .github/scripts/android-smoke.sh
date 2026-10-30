@@ -60,3 +60,16 @@ if [ "${top_edge:-0}" -le 0 ]; then
   annotate error "The page runs under the status bar" "$view"
   exit 1
 fi
+
+# Confirmations (delete an expense, remove someone, leave a group) use the page's confirm(). A WebView shows it only
+# when the app gives it a WebChromeClient; without one, confirm() silently answers "no" and the action never happens.
+cdp Runtime.evaluate '{"expression":"setTimeout(() => { window.__answer = confirm(\"Eventide dialog check\"); }, 0); true"}' >/dev/null
+sleep 3
+adb shell uiautomator dump /sdcard/dialog.xml >/dev/null 2>&1
+dialog=$(adb exec-out cat /sdcard/dialog.xml)
+if ! printf '%s' "$dialog" | grep -q "Eventide dialog check"; then
+  annotate error "Confirmation dialogs do not show" "confirm() opened no dialog, so delete, remove and leave do nothing in the app."
+  exit 1
+fi
+annotate notice "Confirmation dialogs show" "confirm() opened a dialog."
+adb shell input keyevent KEYCODE_BACK
