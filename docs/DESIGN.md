@@ -341,6 +341,12 @@ Limits to know about:
 - The first request after five idle minutes waits for Neon to wake (well under a second).
 - Free tiers change. The code uses standard Postgres and plain HTTP so moving provider is a configuration
   change. [ADR 0004](decisions/0004-free-tier-hosting.md).
+- **Limits per person** (migration 0006, `packages/db/src/limits.ts`), since sign-up is open and these allowances
+  are shared by everyone: 50 groups at once, 50 people per group, 20 open invite links per group, and in any 24
+  hours 2,000 changes and 20 new groups. Real use is a few dozen changes a day. A day's limit bounds one account to
+  about a megabyte a day. The activity count runs as the owner, so changes in a group since deleted still count. A
+  limit answers 403 `LIMIT_REACHED` with a plain sentence; the app shows it on the change, and does not retry.
+  The limits bound each account, not the number of accounts; the per-IP rate limit is what slows someone with many.
 
 ## 12. Testing, and proving the claims
 

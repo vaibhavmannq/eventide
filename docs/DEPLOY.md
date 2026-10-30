@@ -88,13 +88,16 @@ A person who signs in with Google and with GitHub using the same verified email 
 
 None of the free plans can charge you: there is no card on any of them. Past its limits, Cloudflare answers with an
 error page until midnight UTC, Hyperdrive refuses queries, and Neon suspends the database until next month. So the
-worst a stranger can do is take Eventide offline for a while. Three things to know:
+worst a stranger can do is take Eventide offline for a while. Four things to know:
 
 - **Who can sign up.** Open: `"vars": { "SIGNUPS": "open" }` in wrangler.jsonc, since the Android and Windows
   downloads are shared with people the owner knows (2026-10-26). Set it to `"closed"` and deploy to go back to
   invite-only: a new account can then only be created by someone arriving through a valid invite link, or whose
   email is listed in the `ALLOWED_EMAILS` secret (comma-separated). Anyone with an account can always sign in.
   A value in wrangler.jsonc replaces one set in the dashboard on every deploy, so change it here, not there.
+- **Limits per person** (DESIGN §11): 50 groups at once, 50 people per group, 20 open invite links per group,
+  2,000 changes and 20 new groups a day. To change one, edit `packages/db/src/limits.ts` (and, for people per
+  group, `accept_invite` in a new migration).
 - **Rate limits** (`ratelimits` in wrangler.jsonc): 300 requests a minute per IP address, 120 per signed-in person.
   Real use is a few a minute. Over the limit the API answers 429 and the app keeps the change and retries later.
   Local development and CI set `RATE_LIMITS=off` in `.dev.vars`: there every test browser looks like one address.
