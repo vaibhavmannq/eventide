@@ -46,7 +46,11 @@ Choose a long password when asked. Then:
 ## Making a release
 
 Actions → **Apps** → Run workflow, on `main`, with a version like `0.1.0` (higher each time). About 15 minutes later
-the release `v0.1.0` has `Eventide-android.apk` and `Eventide-windows-setup.exe`.
+the release `v0.1.0` has the APK, the Windows installer, the Linux `.deb` and AppImage, and `SHA256SUMS.txt`.
+Each file also gets a build attestation: GitHub's signed record that this repository's workflow built it, from
+which commit. Anyone can check a download with `gh attestation verify <file> --repo vaibhavmannq/eventide`.
+The installers are still not code-signed (that costs money), so SmartScreen still warns; the attestation is how
+to prove a file is genuine.
 
 - **Android:** open the APK on the phone; allow installing from the browser or files app when asked.
 - **Windows:** the installer is not signed with a paid certificate, so SmartScreen may warn: More info → Run anyway.

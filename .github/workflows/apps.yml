@@ -248,12 +248,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # The build attestation: a signed record, kept by GitHub, that these exact files were built here.
+      id-token: write
+      attestations: write
     steps:
       - name: Collect the builds
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: out
           merge-multiple: true
+
+      - name: List each file's SHA-256
+        working-directory: out
+        run: sha256sum Eventide-* | tee SHA256SUMS.txt
+
+      - name: Attest where the files were built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: 'out/Eventide-*'
 
       - name: Publish the release
         env:
@@ -272,6 +284,10 @@ jobs:
           or `Eventide-linux-x86_64.AppImage` for any other distribution (`chmod +x` it, then run it).
 
           Nothing to install? Eventide also works in any browser.
+
+          **Checking a download (optional):** `SHA256SUMS.txt` lists every file's SHA-256, and GitHub keeps a signed
+          record that each file was built by this repository's workflow. With the GitHub CLI:
+          `gh attestation verify Eventide-windows-setup.exe --repo vaibhavmannq/eventide`.
           NOTES
-          gh release create "v$VERSION" out/Eventide-* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create "v$VERSION" out/Eventide-* out/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Eventide $VERSION" --notes-file notes.md

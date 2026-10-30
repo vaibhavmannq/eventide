@@ -14,7 +14,9 @@ export type StoreErrorCode =
   /** Only the person who started the group can do this. */
   | 'FORBIDDEN'
   /** Someone still owes or is owed money in this group, so they cannot leave or be removed yet. */
-  | 'NOT_SETTLED';
+  | 'NOT_SETTLED'
+  /** One of the limits per person in limits.ts. */
+  | 'LIMIT_REACHED';
 
 export class StoreError extends Error {
   readonly code: StoreErrorCode;

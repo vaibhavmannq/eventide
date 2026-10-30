@@ -8,7 +8,10 @@ import { z } from 'zod';
 
 const id = z.uuid();
 const currency = z.string().regex(/^[A-Z]{3}$/, 'A three-letter currency code, like GBP');
-const amount = z.int();
+// A trillion minor units (10 billion rupees, pounds or dollars) is far beyond any shared bill, and keeps every sum
+// of up to 100 people's amounts exact in JavaScript and in Postgres's bigint.
+export const MAX_AMOUNT = 1_000_000_000_000;
+const amount = z.int().min(-MAX_AMOUNT).max(MAX_AMOUNT);
 const name = z.string().trim().min(1).max(100);
 const people = <T extends z.ZodType>(item: T) => z.array(item).min(1).max(100);
 

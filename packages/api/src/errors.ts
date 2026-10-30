@@ -26,6 +26,8 @@ const STORE_STATUS: Record<StoreError['code'], ContentfulStatusCode> = {
   KIND_MISMATCH: 422,
   FORBIDDEN: 403,
   NOT_SETTLED: 409,
+  // Not 429: retrying soon would not help, and the app's outbox retries 429s.
+  LIMIT_REACHED: 403,
 };
 
 /**

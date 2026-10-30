@@ -1,5 +1,6 @@
 import { asUser, type Pool, type Queryable } from './connection.ts';
 import { StoreError } from './errors.ts';
+import { checkNewInvite } from './limits.ts';
 import type { Member, User } from './store.ts';
 import { newToken, one, sha256 } from './util.ts';
 
@@ -100,6 +101,7 @@ export async function createInvite(
   await asUser(pool, userId, async (sql) => {
     const { rows } = await sql.query('select 1 from groups where id = $1', [groupId]);
     if (rows.length === 0) throw new StoreError('NOT_FOUND', 'No such group');
+    await checkNewInvite(sql, groupId);
     await sql.query('insert into invites (token_hash, group_id, created_by, expires_at) values ($1, $2, $3, $4)', [
       await sha256(token),
       groupId,
@@ -149,6 +151,7 @@ export async function acceptInvite(
       const code = (error as { code?: string }).code;
       if (code === 'P0002') throw new StoreError('NOT_FOUND', 'This invite link is not valid');
       if (code === '23505') throw new StoreError('CONFLICT', 'That place in the group is already taken');
+      if (code === '54000') throw new StoreError('LIMIT_REACHED', (error as Error).message);
       throw error;
     }
   });
