@@ -69,7 +69,18 @@ export function Groups() {
         {ids.length === 0 ? (
           <div class="empty">
             <Moon lit={0.08} size={56} />
-            <p>Start a group for your flat, a trip, or a dinner, then invite people with a link.</p>
+            <ol class="steps">
+              <li>
+                <strong>Start a group</strong> for your flat, a trip or a dinner.
+              </li>
+              <li>
+                <strong>Add the people.</strong> Just their names: they don’t need the app. Send an invite link when
+                they want to see it.
+              </li>
+              <li>
+                <strong>Add what you spend.</strong> Eventide works out the fewest payments to settle up.
+              </li>
+            </ol>
           </div>
         ) : (
           <>

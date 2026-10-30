@@ -9,6 +9,14 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
   const p = providers.value;
   const to = (provider: string) =>
     `/api/auth/${provider}?next=${encodeURIComponent(next.startsWith('/?signin=') ? '/' : next)}`;
+  // In the apps, signing in happens in the browser (DESIGN §9.1): the app cancels the link and opens it there, so
+  // this page stays, and says so on the button that was pressed. On the website the link simply leaves the page.
+  const [waiting, setWaiting] = useState<'github' | 'google' | null>(null);
+  const press = (provider: 'github' | 'google') => () => {
+    if (inApp) setWaiting(provider);
+  };
+  const label = (provider: 'github' | 'google', text: string) =>
+    waiting === provider ? 'Continue in your browser…' : text;
   return (
     <main class="signin">
       <div class="signin-body">
@@ -20,16 +28,30 @@ export function SignIn({ next = location.pathname + location.search }: { next?: 
         </p>
         <div class="actions">
           {p.github && (
-            <a class="pill pill-solid" href={to('github')}>
-              Sign in with GitHub <span aria-hidden="true">→</span>
+            <a
+              class={`pill pill-solid${waiting === 'github' ? ' pill-waiting' : ''}`}
+              href={to('github')}
+              onClick={press('github')}
+            >
+              {label('github', 'Sign in with GitHub')}
+              {waiting !== 'github' && <span aria-hidden="true"> →</span>}
             </a>
           )}
           {p.google && (
-            <a class="pill" href={to('google')}>
-              Sign in with Google
+            <a
+              class={`pill${waiting === 'google' ? ' pill-waiting' : ''}`}
+              href={to('google')}
+              onClick={press('google')}
+            >
+              {label('google', 'Sign in with Google')}
             </a>
           )}
         </div>
+        {waiting && (
+          <p class="muted small signin-waiting" role="status">
+            Sign in there, and Eventide opens again on its own.
+          </p>
+        )}
         {outcome === 'failed' && (
           <p class="notice notice-bad" role="alert">
             Signing in didn’t work. Please try again.
